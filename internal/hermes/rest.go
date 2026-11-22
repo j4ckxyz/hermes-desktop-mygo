@@ -149,6 +149,9 @@ func (c *Client) post(ctx context.Context, path string, body, out any, authed bo
 }
 
 func (c *Client) doAuth(ctx context.Context, method, path string, q url.Values, body, out any, authed bool) error {
+	if authed && c.auth != nil {
+		c.auth.Prepare(ctx, c) // refresh tokens about to expire first
+	}
 	for attempt := 0; ; attempt++ {
 		resp, err := c.raw(ctx, method, path, q, body, authed)
 		if err != nil {
@@ -160,7 +163,7 @@ func (c *Client) doAuth(ctx context.Context, method, path string, q url.Values, 
 			return err
 		}
 		if resp.StatusCode == http.StatusUnauthorized && authed && attempt == 0 && c.auth != nil {
-			if ok, rerr := c.auth.Refresh(ctx, c); rerr != nil {
+			if ok, rerr := c.auth.Refresh(ctx, c, resp.Request); rerr != nil {
 				return rerr
 			} else if ok {
 				continue

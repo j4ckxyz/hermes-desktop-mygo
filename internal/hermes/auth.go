@@ -9,15 +9,19 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 )
 
-// Auth signs requests. A Client calls Refresh once after a 401 and retries
-// the request when it reports true.
+// Auth signs requests. A Client calls Prepare before each authenticated
+// request (to refresh credentials about to expire), and Refresh once after
+// a 401 with the request that failed, retrying it when Refresh reports
+// true.
 type Auth interface {
 	Apply(r *http.Request)
-	Refresh(ctx context.Context, c *Client) (bool, error)
+	Prepare(ctx context.Context, c *Client)
+	Refresh(ctx context.Context, c *Client, failed *http.Request) (bool, error)
 	// WSToken is a credential the socket accepts as ?token= when no ticket
 	// can be minted, or "".
 	WSToken() string
@@ -28,8 +32,9 @@ type Auth interface {
 // refresh: a 401 means the token was rotated.
 type TokenAuth struct{ Token string }
 
-func (a *TokenAuth) Apply(r *http.Request) { r.Header.Set("X-Hermes-Session-Token", a.Token) }
-func (a *TokenAuth) Refresh(context.Context, *Client) (bool, error) {
+func (a *TokenAuth) Apply(r *http.Request)            { r.Header.Set("X-Hermes-Session-Token", a.Token) }
+func (a *TokenAuth) Prepare(context.Context, *Client) {}
+func (a *TokenAuth) Refresh(context.Context, *Client, *http.Request) (bool, error) {
 	return false, nil
 }
 func (a *TokenAuth) WSToken() string { return a.Token }
@@ -61,6 +66,61 @@ type PasswordAuth struct {
 	mu      sync.Mutex
 	tokens  Tokens
 	cookies bool // signed in by cookie (the client's jar holds the session)
+	// refreshing lets one refresh run at a time; the others wait for it.
+	refreshing chan struct{}
+}
+
+// refreshEarly is how long before expires_at the tokens are refreshed.
+const refreshEarly = time.Minute
+
+// Prepare refreshes the tokens before a request when they expire within a
+// minute, so the request does not fail on them.
+func (a *PasswordAuth) Prepare(ctx context.Context, c *Client) {
+	a.mu.Lock()
+	t := a.tokens
+	a.mu.Unlock()
+	if t.RefreshToken == "" || t.ExpiresAt.IsZero() || time.Until(t.ExpiresAt.Time) > refreshEarly {
+		return
+	}
+	a.refresh(ctx, c, func(cur Tokens) bool {
+		return cur.AccessToken != "" && time.Until(cur.ExpiresAt.Time) > refreshEarly
+	})
+}
+
+// Refresh renews the tokens after a 401. When another request refreshed
+// them while this one waited, it only asks for a retry.
+func (a *PasswordAuth) Refresh(ctx context.Context, c *Client, failed *http.Request) (bool, error) {
+	used := ""
+	if failed != nil {
+		used = strings.TrimPrefix(failed.Header.Get("Authorization"), "Bearer ")
+	}
+	return a.refresh(ctx, c, func(cur Tokens) bool {
+		return cur.AccessToken != "" && cur.AccessToken != used
+	})
+}
+
+// refresh runs one refresh at a time. fresh reports whether the tokens no
+// longer need it (another refresh finished meanwhile).
+func (a *PasswordAuth) refresh(ctx context.Context, c *Client, fresh func(Tokens) bool) (bool, error) {
+	a.mu.Lock()
+	if a.refreshing == nil {
+		a.refreshing = make(chan struct{}, 1)
+	}
+	sem := a.refreshing
+	a.mu.Unlock()
+	select {
+	case sem <- struct{}{}:
+	case <-ctx.Done():
+		return false, ctx.Err()
+	}
+	defer func() { <-sem }()
+	a.mu.Lock()
+	cur := a.tokens
+	a.mu.Unlock()
+	if fresh(cur) {
+		return true, nil
+	}
+	return a.renew(ctx, c)
 }
 
 // SetTokens restores tokens saved from an earlier launch.
@@ -92,7 +152,8 @@ func (a *PasswordAuth) WSToken() string {
 	return a.tokens.AccessToken
 }
 
-func (a *PasswordAuth) Refresh(ctx context.Context, c *Client) (bool, error) {
+// renew uses the refresh token, or the password in a cookie session.
+func (a *PasswordAuth) renew(ctx context.Context, c *Client) (bool, error) {
 	a.mu.Lock()
 	t := a.tokens
 	a.mu.Unlock()

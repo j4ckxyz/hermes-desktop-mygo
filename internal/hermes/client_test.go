@@ -396,3 +396,71 @@ func TestMessageFlagsAcceptIntegers(t *testing.T) {
 		t.Fatalf("%+v", ms)
 	}
 }
+
+func TestOneRefreshAtATime(t *testing.T) {
+	srv := hermestest.New(hermestest.Options{Username: "jack", Password: "pw"})
+	defer srv.Close()
+	// The refresh is slow, so concurrent 401s pile up behind it.
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/native/refresh" {
+			time.Sleep(150 * time.Millisecond)
+		}
+		srv.Config.Handler.ServeHTTP(w, r)
+	}))
+	defer slow.Close()
+	auth := &hermes.PasswordAuth{Username: "jack", Password: "pw"}
+	c, _ := hermes.New(slow.URL, auth)
+	if err := auth.SignIn(ctx(t), c); err != nil {
+		t.Fatal(err)
+	}
+	srv.ExpireAccess()
+	var wg sync.WaitGroup
+	errs := make(chan error, 10)
+	for range 10 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := c.Profiles(ctx(t)); err != nil {
+				errs <- err
+			}
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
+	}
+	if n := srv.CallCount("POST /auth/native/refresh"); n != 1 {
+		t.Fatalf("%d refreshes for one expiry; want 1", n)
+	}
+}
+
+func TestRefreshAMinuteEarly(t *testing.T) {
+	srv := hermestest.New(hermestest.Options{Username: "jack", Password: "pw"})
+	defer srv.Close()
+	auth := &hermes.PasswordAuth{Username: "jack", Password: "pw"}
+	c, _ := hermes.New(srv.URL, auth)
+	if err := auth.SignIn(ctx(t), c); err != nil {
+		t.Fatal(err)
+	}
+	tk := auth.Tokens()
+	tk.ExpiresAt = hermes.Time{Time: time.Now().Add(30 * time.Second)}
+	auth.SetTokens(tk)
+	if _, err := c.Profiles(ctx(t)); err != nil {
+		t.Fatal(err)
+	}
+	if srv.CallCount("POST /auth/native/refresh") != 1 {
+		t.Fatal("tokens expiring within a minute are refreshed before the request")
+	}
+	if srv.CallCount("GET /api/profiles") != 1 {
+		t.Fatal("the request went once, with the new token (no 401 and retry)")
+	}
+	if auth.Tokens().AccessToken == tk.AccessToken {
+		t.Fatal("new access token")
+	}
+	// Tokens with plenty of time left are not refreshed.
+	c.Profiles(ctx(t))
+	if srv.CallCount("POST /auth/native/refresh") != 1 {
+		t.Fatal("no refresh while the token is good")
+	}
+}
