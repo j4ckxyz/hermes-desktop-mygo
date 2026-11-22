@@ -39,6 +39,8 @@ type Deps struct {
 	Notify func(title, body string)
 	// Dial options for the socket (tests shorten the timings).
 	Dial hermes.DialOptions
+	// FetchTitle reads a link's page title (nil: FetchTitle).
+	FetchTitle func(ctx context.Context, url string) (string, error)
 }
 
 // App is the whole app state.
@@ -49,6 +51,9 @@ type App struct {
 	Conn *Connection
 	// Errors shown as toasts; the view pops them.
 	Toasts []string
+	// LinkPreviews lets link cards fetch their page's title.
+	LinkPreviews bool
+	links        linkTitles
 }
 
 // New returns the app with its saved instances.
@@ -744,8 +749,8 @@ func (c *Connection) handleEvent(ev hermes.Event, now time.Time, touched map[*Ch
 		// Persist the finished turn with the stored transcript.
 		go c.loadChat(ch.ID, ch.Profile, true)
 	}
-	if ch.Live.Current() != nil && ch.Live.Current().Prompt != nil && ev.Type == "approval.request" && c.app.Notify != nil {
-		c.app.Notify("Hermes needs your approval", promptText(*ch.Live.Current().Prompt))
+	if cur := ch.Live.Current(); cur != nil && cur.Prompt != nil && (ev.Type == "approval.request" || ev.Type == "clarify.request") && c.app.Notify != nil {
+		c.app.Notify(promptTitle(*cur.Prompt), promptText(*cur.Prompt))
 	}
 }
 
@@ -756,7 +761,22 @@ func lastTurn(ch *Chat) *transcript.Turn {
 	return nil
 }
 
+func promptTitle(p hermes.Prompt) string {
+	switch p.Kind {
+	case "sudo":
+		return "Hermes needs your sudo password"
+	case "secret":
+		return "Hermes needs " + p.EnvVar
+	case "questions", "clarify":
+		return "Hermes has a question"
+	}
+	return "Hermes needs your approval"
+}
+
 func promptText(p hermes.Prompt) string {
+	if len(p.Questions) > 0 {
+		return p.Questions[0].Question
+	}
 	for _, s := range []string{p.Command, p.Question, p.Description} {
 		if strings.TrimSpace(s) != "" {
 			return s
@@ -766,14 +786,19 @@ func promptText(p hermes.Prompt) string {
 }
 
 func (c *Connection) handleRequest(r hermes.ServerRequest, now time.Time, touched map[*Chat]bool) {
-	if p, ok := hermes.LegacyApproval(r); ok && r.StoredID != "" {
+	// Approvals (legacy wire), sudo passwords, secrets and clarify batches
+	// become a card in the chat, as canonical approvals do.
+	if p, ok := hermes.PromptFromRequest(r); ok && r.StoredID != "" {
 		ch := c.chat(r.StoredID, "")
 		ch.Live.SetPrompt(p, now)
 		touched[ch] = true
+		if c.app.Notify != nil {
+			c.app.Notify(promptTitle(p), promptText(p))
+		}
 		return
 	}
-	// sudo, secret and clarify batches need input the app does not ask
-	// for yet; decline so the agent is not left waiting.
+	// A desktop-only request (preview.*, vault.*, …) this app cannot show:
+	// decline it so the agent is not left waiting.
 	if ws := c.ws; ws != nil {
 		go ws.Decline(r.ID)
 	}
@@ -811,6 +836,8 @@ func (c *Connection) Send(id, profile, text string, created func(id string)) {
 		ch.rebuild()
 		c.Running[id] = true
 	}
+	// A message sent while the agent still works on the last one queues.
+	queued := ch != nil && len(ch.Live.Turns) > 1 && ch.Live.Turns[len(ch.Live.Turns)-2].Running()
 	go func() {
 		stored := id
 		if stored == "" {
@@ -833,9 +860,12 @@ func (c *Connection) Send(id, profile, text string, created func(id string)) {
 				}
 			})
 		}
-		queued := false
-		if ch != nil && len(ch.Live.Turns) > 1 && ch.Live.Turns[len(ch.Live.Turns)-2].Running() {
-			queued = true
+		// The legacy wire addresses a chat by the runtime id its resume
+		// returned: attach first if the chat's own resume has not finished.
+		if ws.RuntimeID(stored) == "" {
+			if _, err := ws.Resume(c.ctx, profile, stored); err != nil {
+				c.post(func() { c.app.Toast("Could not open the chat: " + err.Error()) })
+			}
 		}
 		if _, err := ws.Submit(c.ctx, profile, stored, text, queued); err != nil {
 			c.post(func() {
@@ -886,6 +916,36 @@ func (c *Connection) Answer(id, answer string) {
 			c.post(func() { c.app.Toast("Could not answer: " + err.Error()) })
 		}
 	}()
+}
+
+// AnswerQuestions answers a clarify batch (nil answers cancel it).
+func (c *Connection) AnswerQuestions(id string, answers map[string]*string) {
+	p, ws := c.takePrompt(id)
+	if p == nil {
+		return
+	}
+	go func() {
+		if err := ws.AnswerQuestions(*p, answers); err != nil {
+			c.post(func() { c.app.Toast("Could not answer: " + err.Error()) })
+		}
+	}()
+}
+
+// takePrompt removes a chat's card and returns it with the socket.
+func (c *Connection) takePrompt(id string) (*hermes.Prompt, *hermes.Conn) {
+	ch := c.Chats[id]
+	if ch == nil || c.ws == nil {
+		return nil, nil
+	}
+	cur := ch.Live.Current()
+	if cur == nil || cur.Prompt == nil {
+		return nil, nil
+	}
+	p := *cur.Prompt
+	cur.Prompt = nil
+	cur.Version++
+	ch.rebuild()
+	return &p, c.ws
 }
 
 // Rename renames a session.

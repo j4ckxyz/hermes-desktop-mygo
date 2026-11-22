@@ -528,6 +528,19 @@ func (l *Live) Apply(ev hermes.Event, now time.Time) bool {
 		t.Version++
 		return true
 
+	case "request.cancel": // the server withdrew a request (timeout, interrupt…)
+		var p struct {
+			ID string `json:"id"`
+		}
+		ev.Decode(&p)
+		t := l.Current()
+		if t == nil || t.Prompt == nil || t.Prompt.RequestID == "" || t.Prompt.RequestID != p.ID {
+			return false
+		}
+		t.Prompt = nil
+		t.Version++
+		return true
+
 	case "approval.settled", "clarify.settled", "approval.cancelled":
 		t := l.Current()
 		if t == nil || t.Prompt == nil {

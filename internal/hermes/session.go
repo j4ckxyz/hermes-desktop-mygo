@@ -49,7 +49,9 @@ type SessionInfo struct {
 // docs §7.3). Legacy approvals arrive as server requests and are folded
 // into the same shape with RequestID set.
 type Prompt struct {
-	Kind                string   `json:"kind"` // "approval" | "clarify"
+	// Kind is "approval" or "clarify" (cards on either wire), or a server
+	// request's: "sudo", "secret" or "questions" (a clarify batch).
+	Kind                string   `json:"kind"`
 	PromptID            string   `json:"prompt_id"`
 	ExecutionGeneration int64    `json:"execution_generation"`
 	Choices             []string `json:"choices"`
@@ -61,6 +63,61 @@ type Prompt struct {
 	// Legacy server request id, answered with Respond.
 	RequestID string `json:"-"`
 	ToolName  string `json:"tool_name,omitempty"`
+	// EnvVar is the variable a secret prompt asks for.
+	EnvVar string `json:"env_var,omitempty"`
+	// Questions are a clarify batch's (1–5 questions).
+	Questions []Question `json:"questions,omitempty"`
+}
+
+// Question is one question of a clarify batch.
+type Question struct {
+	QID         string   `json:"qid"`
+	Question    string   `json:"question"`
+	Choices     []string `json:"choices"`
+	MultiSelect bool     `json:"multi_select"`
+}
+
+// PromptFromRequest folds a server request into a prompt card: a legacy
+// approval, a sudo password, a secret or a clarify batch (docs §7.3). It
+// reports false for requests the app does not show (desktop-only ones).
+func PromptFromRequest(r ServerRequest) (Prompt, bool) {
+	switch r.Method {
+	case "approval":
+		return LegacyApproval(r)
+	case "sudo":
+		var p struct {
+			Command string `json:"command"`
+		}
+		json.Unmarshal(r.Params, &p)
+		return Prompt{Kind: "sudo", PromptID: r.ID, RequestID: r.ID, Command: p.Command}, true
+	case "secret":
+		var p struct {
+			EnvVar string `json:"env_var"`
+			Prompt string `json:"prompt"`
+		}
+		if json.Unmarshal(r.Params, &p) != nil || p.EnvVar == "" {
+			return Prompt{}, false
+		}
+		return Prompt{Kind: "secret", PromptID: r.ID, RequestID: r.ID, EnvVar: p.EnvVar, Question: p.Prompt}, true
+	case "clarify":
+		var p struct {
+			Questions []Question `json:"questions"`
+		}
+		if json.Unmarshal(r.Params, &p) != nil || len(p.Questions) == 0 {
+			return Prompt{}, false
+		}
+		return Prompt{Kind: "questions", PromptID: r.ID, RequestID: r.ID, Questions: p.Questions}, true
+	}
+	return Prompt{}, false
+}
+
+// AnswerQuestions answers a clarify batch: an answer per question id, nil
+// for one skipped. A nil map cancels them all.
+func (c *Conn) AnswerQuestions(p Prompt, answers map[string]*string) error {
+	if answers == nil {
+		return c.Respond(p.RequestID, map[string]any{"outcome": "cancelled"})
+	}
+	return c.Respond(p.RequestID, map[string]any{"answers": answers, "outcome": "submitted"})
 }
 
 // CreateSession starts a new chat with an agent.
@@ -158,7 +215,15 @@ func (c *Conn) AnswerPrompt(ctx context.Context, stored string, p Prompt, answer
 	if sid == "" {
 		sid = stored
 	}
-	if p.RequestID != "" { // a legacy server request
+	if p.RequestID != "" { // a server request
+		switch p.Kind {
+		case "sudo", "secret": // "" skips
+			return c.Respond(p.RequestID, map[string]any{"value": answer})
+		case "questions":
+			if len(p.Questions) == 1 {
+				return c.AnswerQuestions(p, map[string]*string{p.Questions[0].QID: &answer})
+			}
+		}
 		return c.Respond(p.RequestID, map[string]any{"choice": answer})
 	}
 	if p.Kind == "clarify" {

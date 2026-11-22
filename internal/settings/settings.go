@@ -41,6 +41,9 @@ type Settings struct {
 	BackgroundArtwork  bool             `json:"backgroundArtwork"`
 	TranslucentSidebar bool             `json:"translucentSidebar"`
 
+	// LinkPreviews fetches the titles of links in replies.
+	LinkPreviews bool `json:"linkPreviews"`
+
 	// Notifications
 	NotifyOnFinish   bool `json:"notifyOnFinish"`
 	NotifyOnApproval bool `json:"notifyOnApproval"`
@@ -73,6 +76,7 @@ func Default() Settings {
 		BackgroundArtwork: true,
 		NotifyOnFinish:    true,
 		NotifyOnApproval:  true,
+		LinkPreviews:      true,
 	}
 }
 

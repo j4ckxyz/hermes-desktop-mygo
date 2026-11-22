@@ -102,6 +102,8 @@ type Server struct {
 	Calls map[string]int
 	// Submitted records the prompts sent, by session.
 	Submitted map[string][]string
+	// Responses records the client's answers to server requests, by id.
+	Responses map[string]json.RawMessage
 	nextID    atomic.Int64
 }
 
@@ -116,7 +118,7 @@ func New(opt Options) *Server {
 	s := &Server{
 		opt: opt, tickets: map[string]bool{}, codes: map[string]string{}, pkce: map[string]string{},
 		access: map[string]bool{}, refresh: map[string]bool{}, cookies: map[string]bool{}, revision: map[string]int64{},
-		Calls: map[string]int{}, Submitted: map[string][]string{},
+		Calls: map[string]int{}, Submitted: map[string][]string{}, Responses: map[string]json.RawMessage{},
 	}
 	if opt.Seed != nil {
 		s.data = *opt.Seed
@@ -611,8 +613,17 @@ func (k *socket) serve() {
 		if json.Unmarshal(data, &f) != nil {
 			continue
 		}
-		if f.Method == "" {
-			continue // a response to a server request
+		if f.Method == "" { // a response to a server request
+			var id string
+			json.Unmarshal(f.ID, &id)
+			reply := f.Result
+			if len(reply) == 0 {
+				reply = json.RawMessage(`{"error":true}`)
+			}
+			k.s.mu.Lock()
+			k.s.Responses[id] = append(json.RawMessage(nil), reply...)
+			k.s.mu.Unlock()
+			continue
 		}
 		k.s.count(f.Method)
 		res, rerr := k.handle(f.Method, f.Params)
@@ -814,4 +825,54 @@ func (s *Server) Run(stored, fixture string, delay time.Duration) bool {
 		s.opt.Delay = old
 	}()
 	return true
+}
+
+// Ask sends a server request (sudo, secret, clarify, approval…) about a
+// stored session on the newest socket and returns its id.
+func (s *Server) Ask(stored, method string, params map[string]any) string {
+	s.mu.Lock()
+	var k *socket
+	if n := len(s.sockets); n > 0 {
+		k = s.sockets[n-1]
+	}
+	s.mu.Unlock()
+	if k == nil {
+		return ""
+	}
+	sid := stored
+	if !s.opt.Canonical {
+		sid = "rt-" + stored
+	}
+	id := fmt.Sprintf("srq-%012x", s.nextID.Add(1))
+	p := map[string]any{"session_id": sid}
+	for key, v := range params {
+		p[key] = v
+	}
+	k.write(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": p})
+	return id
+}
+
+// Withdraw sends request.cancel for an open server request.
+func (s *Server) Withdraw(stored, id string) {
+	s.mu.Lock()
+	var k *socket
+	if n := len(s.sockets); n > 0 {
+		k = s.sockets[n-1]
+	}
+	s.mu.Unlock()
+	if k == nil {
+		return
+	}
+	sid := stored
+	if !s.opt.Canonical {
+		sid = "rt-" + stored
+	}
+	k.event("request.cancel", sid, map[string]any{"id": id, "method": "sudo", "reason": "timeout"})
+}
+
+// Response returns the client's answer to a server request.
+func (s *Server) Response(id string) json.RawMessage {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.Responses[id]
 }

@@ -1,6 +1,8 @@
 package core
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -323,5 +325,113 @@ func TestSyncPagesThenStopsEarly(t *testing.T) {
 	e.loop.until(t, "second sync", func() bool { return c.Synced })
 	if n := e.srv.CallCount("GET /api/profiles/sessions"); n != 3 {
 		t.Fatalf("incremental sync should read one page, read %d", n-2)
+	}
+}
+
+func TestLinkTitles(t *testing.T) {
+	page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if r.URL.Path == "/og" {
+			w.Write([]byte(`<html><head><meta property="og:title" content="From OG"><title>Not this</title>`))
+			return
+		}
+		w.Write([]byte("<html><head><title>\n  Hermes dashboard &middot; Cron jobs </title></head>"))
+	}))
+	defer page.Close()
+	loop := newLoop()
+	app := New(Deps{Post: loop.post}, settings.Instances{})
+	app.LinkPreviews = true
+	if app.LinkTitle(page.URL+"/cron") != "" {
+		t.Fatal("unknown at first")
+	}
+	loop.until(t, "title", func() bool { return app.LinkTitle(page.URL+"/cron") != "" })
+	if got := app.LinkTitle(page.URL + "/cron"); got != "Hermes dashboard · Cron jobs" {
+		t.Fatalf("title %q", got)
+	}
+	app.LinkTitle(page.URL + "/og")
+	loop.until(t, "og", func() bool { return app.LinkTitle(page.URL+"/og") == "From OG" })
+	app.LinkPreviews = false
+	if app.LinkTitle("https://example.invalid/x") != "" || len(app.links.pending) != 0 {
+		t.Fatal("previews off: no fetch")
+	}
+}
+
+func TestServerRequestCards(t *testing.T) {
+	for _, canonical := range []bool{false, true} {
+		t.Run(map[bool]string{true: "canonical", false: "legacy"}[canonical], func(t *testing.T) {
+			e := setup(t, hermestest.Options{Canonical: canonical, Reply: "design_turn.jsonl", Delay: time.Millisecond}, "")
+			e.app.Open(e.inst)
+			c := e.app.Conn
+			e.loop.until(t, "connected", func() bool { return c.Synced && c.ws != nil })
+			id := "20261122_060000_0a0b0c"
+			ch := c.OpenChat(id)
+			e.loop.until(t, "subscribed", func() bool { return ch.Fetched && ch.subscribed })
+			c.Send(id, "default", "install it", nil)
+			e.loop.until(t, "running", func() bool { cur := ch.Live.Current(); return cur != nil && len(cur.Tools) == 3 })
+			card := func() *hermes.Prompt {
+				if cur := ch.Live.Current(); cur != nil {
+					return cur.Prompt
+				}
+				return nil
+			}
+
+			// sudo: the password goes back as {value}.
+			rid := e.srv.Ask(id, "sudo", map[string]any{"command": "apt install jq"})
+			e.loop.until(t, "sudo card", func() bool { return card() != nil && card().Kind == "sudo" })
+			if card().Command != "apt install jq" {
+				t.Fatalf("%+v", card())
+			}
+			c.Answer(id, "hunter2")
+			e.loop.until(t, "sudo reply", func() bool { return e.srv.Response(rid) != nil })
+			if got := string(e.srv.Response(rid)); got != `{"value":"hunter2"}` {
+				t.Fatalf("sudo reply %s", got)
+			}
+
+			// secret, skipped: {value:""}.
+			rid = e.srv.Ask(id, "secret", map[string]any{"env_var": "NOTION_API_KEY", "prompt": "Paste your Notion key"})
+			e.loop.until(t, "secret card", func() bool { return card() != nil && card().Kind == "secret" })
+			if card().EnvVar != "NOTION_API_KEY" || card().Question != "Paste your Notion key" {
+				t.Fatalf("%+v", card())
+			}
+			c.Answer(id, "")
+			e.loop.until(t, "secret reply", func() bool { return e.srv.Response(rid) != nil })
+			if got := string(e.srv.Response(rid)); got != `{"value":""}` {
+				t.Fatalf("secret reply %s", got)
+			}
+
+			// A clarify batch: answers by question id, nil for one skipped.
+			rid = e.srv.Ask(id, "clarify", map[string]any{"questions": []any{
+				map[string]any{"qid": "q1", "question": "Which list?", "choices": []string{"Inbox", "School"}},
+				map[string]any{"qid": "q2", "question": "Any notes?"},
+			}})
+			e.loop.until(t, "questions card", func() bool { return card() != nil && card().Kind == "questions" })
+			if len(card().Questions) != 2 || card().Questions[0].Choices[1] != "School" {
+				t.Fatalf("%+v", card())
+			}
+			school := "School"
+			c.AnswerQuestions(id, map[string]*string{"q1": &school, "q2": nil})
+			e.loop.until(t, "clarify reply", func() bool { return e.srv.Response(rid) != nil })
+			if got := string(e.srv.Response(rid)); got != `{"answers":{"q1":"School","q2":null},"outcome":"submitted"}` {
+				t.Fatalf("clarify reply %s", got)
+			}
+
+			// The server withdraws a request: its card goes.
+			rid = e.srv.Ask(id, "sudo", map[string]any{"command": "reboot"})
+			e.loop.until(t, "card", func() bool { return card() != nil && card().Command == "reboot" })
+			e.srv.Withdraw(id, rid)
+			e.loop.until(t, "withdrawn", func() bool { return card() == nil })
+
+			// A desktop-only request is declined, not shown.
+			rid = e.srv.Ask(id, "preview.open", map[string]any{"url": "x"})
+			e.loop.until(t, "declined", func() bool { return e.srv.Response(rid) != nil })
+			if card() != nil {
+				t.Fatal("no card for desktop-only requests")
+			}
+			e.mu.Lock()
+			defer e.mu.Unlock()
+			if len(e.notes) < 3 {
+				t.Fatalf("each card notifies: %v", e.notes)
+			}
+		})
 	}
 }
