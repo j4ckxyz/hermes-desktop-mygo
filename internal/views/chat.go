@@ -10,6 +10,7 @@ import (
 
 	"hermes-desktop/internal/core"
 	"hermes-desktop/internal/hermes"
+	"hermes-desktop/internal/settings"
 	"hermes-desktop/internal/transcript"
 )
 
@@ -184,6 +185,7 @@ func (u *UI) chatView(c *ui.Context, conn *core.Connection, ch *core.Chat) {
 	s, _ := conn.Session(ch.ID)
 	prof, _ := conn.Profile(ch.Profile)
 	u.chatHeader(c, conn, ch, s, prof)
+	u.signedOutBanner(c, conn)
 
 	rows := u.chatRows(ch)
 	ls := u.listFor(ch.ID)
@@ -849,6 +851,7 @@ func (u *UI) newChatView(c *ui.Context, conn *core.Connection) {
 		name = "Hermes"
 	}
 	ui.Row(c).Height(64).DragWindow()
+	u.signedOutBanner(c, conn)
 	ui.Column(c).Grow(1).AlignItems(ui.Center).Justify(ui.Center).Gap(14).Children(func() {
 		st := avatarStyle(prof, u.NewProfile)
 		h := float32(88)
@@ -1014,5 +1017,29 @@ func (u *UI) workPanel(c *ui.Context, ch *core.Chat, t *transcript.Turn) {
 				}
 			})
 		}
+	})
+}
+
+// signedOutBanner asks to sign in again when the instance refused the
+// saved credentials (an expired dashboard sign-in, a rotated API key).
+func (u *UI) signedOutBanner(c *ui.Context, conn *core.Connection) {
+	if conn.Status != core.SignedOut {
+		return
+	}
+	pal := &u.pal
+	msg := "Your sign-in to " + conn.Instance.Name + " has expired."
+	if conn.Instance.Auth == settings.AuthToken {
+		msg = conn.Instance.Name + " no longer accepts the saved API key."
+	}
+	// Under the header (the title bar), as a card in the transcript's column.
+	ui.Row(c).FillWidth().Justify(ui.Center).Padding(4, 24, 8, 24).Children(func() {
+		ui.Row(c).FillWidth().MaxWidth(contentWidth).Gap(12).Padding(10, 16).Radius(16).Background(pal.AccentSoft).Border(1, pal.AccentLine).
+			AlignItems(ui.Center).Role(ui.RoleAlert).Children(func() {
+			Icon(c, "key", 18, pal.AccentText)
+			ui.Text(c, msg).FontSize(14).Grow(1)
+			if ui.PrimaryButton(c, "Sign in again").Clicked() {
+				u.reauth(conn.Instance.ID)
+			}
+		})
 	})
 }

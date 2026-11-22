@@ -356,6 +356,10 @@ func (u *UI) sessionTree(c *ui.Context, conn *core.Connection) {
 	if !conn.Loaded {
 		list.Children(func() {
 			ui.Row(c).Margin(ui.Auto).Gap(10).AlignItems(ui.Center).Children(func() {
+				if conn.Status == core.SignedOut {
+					ui.Text(c, "Sign in again to see your chats.").TextColor(pal.Muted)
+					return
+				}
 				Loader(c, u.Settings.Loader, pal, true)
 				ui.Text(c, "Loading sessions…").TextColor(pal.Muted)
 			})

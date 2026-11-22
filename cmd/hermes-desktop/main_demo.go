@@ -39,7 +39,11 @@ func init() {
 		}
 		app.Secrets = secrets.NewWithBackend(&secrets.MemoryBackend{})
 		in := settings.Instance{ID: "demo", Name: "Main", URL: url, Auth: settings.AuthToken}
-		app.Secrets.Set(in.ID, secrets.Credentials{Token: "demo-token"})
+		tok := "demo-token"
+		if os.Getenv("HERMES_DEMO_SCREEN") == "signedout" {
+			tok = "a-rotated-key" // the instance refuses it: the sign-in banner
+		}
+		app.Secrets.Set(in.ID, secrets.Credentials{Token: tok})
 		app.Instances = settings.Instances{List: []settings.Instance{in}}
 		s.ActiveInstance = in.ID
 		s.SetAgentPinned(in.ID, "default", true)

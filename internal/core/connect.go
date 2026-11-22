@@ -121,7 +121,8 @@ func (a *App) verify(req ConnectRequest) (settings.Instance, error) {
 			return settings.Instance{}, friendly(err, cl.BaseURL().String())
 		}
 		if t := pa.Tokens(); t.AccessToken != "" {
-			cred.Tokens = &t
+			// Bearer tokens: keep them, not the password.
+			cred.Tokens, cred.Password = &t, ""
 		}
 	}
 	if _, err := cl.Me(ctx); err != nil {

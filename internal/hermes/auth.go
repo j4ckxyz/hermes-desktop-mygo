@@ -107,7 +107,12 @@ func (a *PasswordAuth) Refresh(ctx context.Context, c *Client) (bool, error) {
 			return false, err // unreachable: don't burn a password login
 		}
 	}
-	if a.Password == "" {
+	a.mu.Lock()
+	pw := a.Password
+	a.mu.Unlock()
+	if pw == "" {
+		// Tokens-only: the refresh token was refused, so the user signs
+		// in again (the caller sees ErrUnauthorized).
 		return false, nil
 	}
 	if err := a.SignIn(ctx, c); err != nil {
@@ -116,10 +121,13 @@ func (a *PasswordAuth) Refresh(ctx context.Context, c *Client) (bool, error) {
 	return true, nil
 }
 
+// store keeps new tokens. With tokens the password is no longer needed,
+// and is forgotten: a refused refresh token asks the user again.
 func (a *PasswordAuth) store(t Tokens) {
 	a.mu.Lock()
 	a.tokens = t
 	a.cookies = false
+	a.Password = ""
 	a.mu.Unlock()
 	if a.OnTokens != nil {
 		a.OnTokens(t)
@@ -134,6 +142,9 @@ var ErrTooManyAttempts = errors.New("hermes: too many login attempts, try again 
 
 // SignIn signs in with the username and password.
 func (a *PasswordAuth) SignIn(ctx context.Context, c *Client) error {
+	a.mu.Lock()
+	username, password := a.Username, a.Password
+	a.mu.Unlock()
 	provider := a.Provider
 	if provider == "" {
 		provider = "basic"
@@ -172,7 +183,7 @@ func (a *PasswordAuth) SignIn(ctx context.Context, c *Client) error {
 		Next string `json:"next"`
 	}
 	err := c.post(ctx, "/auth/password-login", map[string]string{
-		"provider": provider, "username": a.Username, "password": a.Password, "next": "",
+		"provider": provider, "username": username, "password": password, "next": "",
 	}, &login, false)
 	if err != nil {
 		var ae *APIError

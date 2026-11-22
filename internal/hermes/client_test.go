@@ -160,12 +160,17 @@ func TestPasswordNativeFlowAndRefresh(t *testing.T) {
 	if srv.CallCount("POST /auth/native/refresh") != 1 || len(saved) != 2 {
 		t.Fatalf("refreshes %d saved %d", srv.CallCount("POST /auth/native/refresh"), len(saved))
 	}
-	// Everything expires: refresh fails, the password signs in again.
-	srv.ExpireAll()
-	if _, err := c.Profiles(ctx(t)); err != nil {
-		t.Fatalf("after re-login: %v", err)
+	// The password is forgotten once tokens are issued: when the refresh
+	// token is refused too, the call fails as unauthorized (the app asks
+	// for the password again) rather than signing in silently.
+	if auth.Password != "" {
+		t.Fatal("the password must be dropped once tokens are issued")
 	}
-	if srv.CallCount("POST /auth/password-login") != 2 {
+	srv.ExpireAll()
+	if _, err := c.Profiles(ctx(t)); !errors.Is(err, hermes.ErrUnauthorized) {
+		t.Fatalf("after the refresh token is refused: %v", err)
+	}
+	if srv.CallCount("POST /auth/password-login") != 1 {
 		t.Fatalf("logins %d", srv.CallCount("POST /auth/password-login"))
 	}
 }

@@ -299,15 +299,23 @@ func (c *Connection) credentials() (hermes.Auth, error) {
 		return nil, err
 	}
 	if c.Instance.Auth == settings.AuthPassword {
-		pa := &hermes.PasswordAuth{Username: cr.Username, Password: cr.Password}
-		if cr.Tokens != nil {
-			pa.SetTokens(*cr.Tokens)
-		}
 		id := c.Instance.ID
 		store := c.app.Secrets
+		// With tokens, the keychain keeps only them: a refused refresh
+		// token means signing in again with the password. Only a cookie
+		// session (no tokens) keeps the password, as its cookies are not.
+		pa := &hermes.PasswordAuth{Username: cr.Username}
+		if cr.Tokens != nil {
+			pa.SetTokens(*cr.Tokens)
+			if cr.Password != "" { // written before tokens-only: drop it
+				cr.Password = ""
+				store.Set(id, cr)
+			}
+		} else {
+			pa.Password = cr.Password
+		}
 		pa.OnTokens = func(t hermes.Tokens) {
-			cr.Tokens = &t
-			store.Set(id, cr)
+			store.Set(id, secrets.Credentials{Username: cr.Username, Tokens: &t})
 		}
 		return pa, nil
 	}

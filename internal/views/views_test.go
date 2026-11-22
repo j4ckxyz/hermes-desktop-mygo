@@ -688,3 +688,21 @@ func TestOpenFromNotice(t *testing.T) {
 		t.Fatal("unknown instance")
 	}
 }
+
+func TestSignedOutBanner(t *testing.T) {
+	h := newHarness(t, hermestest.Options{Token: "right"}, true)
+	h.app.Secrets.Set("i1", secrets.Credentials{Token: "rotated"})
+	h.app.Conn.Close()
+	h.app.Open(h.app.Instances.List[0])
+	h.settle("signed out", func() bool { return h.app.Conn != nil && h.app.Conn.Status == core.SignedOut })
+	h.u.Selected = ""
+	h.tt.Frame()
+	if !h.tt.HasText("Main no longer accepts the saved API key.") {
+		t.Fatalf("banner: %q", h.tt.Texts())
+	}
+	h.tt.Click("Sign in again")
+	h.tt.Frame()
+	if h.u.Screen != ScreenConnect || h.u.connect.replace != "i1" {
+		t.Fatal("the banner opens the sign-in for that instance")
+	}
+}

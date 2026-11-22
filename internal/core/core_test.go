@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -259,6 +260,61 @@ func TestPasswordInstance(t *testing.T) {
 	cr, _ := e.app.Secrets.Get("i1")
 	if cr.Tokens == nil || cr.Tokens.AccessToken == "" {
 		t.Fatal("the tokens must be kept in the keychain")
+	}
+	if cr.Password != "" {
+		t.Fatal("once tokens are issued, the password must not be kept")
+	}
+	// The refresh token is refused (expired, revoked): no silent re-login
+	// with a kept password; the instance asks to sign in again.
+	e.srv.ExpireAll()
+	c.Refresh()
+	e.loop.until(t, "signed out", func() bool { return c.Status == SignedOut })
+	if e.srv.CallCount("POST /auth/password-login") != 1 {
+		t.Fatal("no password login after the first")
+	}
+}
+
+func TestPasswordCookieFallbackKeepsPassword(t *testing.T) {
+	e := setup(t, hermestest.Options{Username: "jack", Password: "pw", NoNative: true}, "")
+	e.app.Open(e.inst)
+	c := e.app.Conn
+	e.loop.until(t, "connected", func() bool { return c.Synced && c.Status == Connected })
+	cr, _ := e.app.Secrets.Get("i1")
+	if cr.Tokens != nil || cr.Password != "pw" {
+		t.Fatalf("a cookie session keeps the password (its cookies are not kept): %+v", cr.Tokens)
+	}
+}
+
+func TestConnectStoresTokensNotPassword(t *testing.T) {
+	srv := hermestest.New(hermestest.Options{Username: "jack", Password: "pw"})
+	defer srv.Close()
+	loop := newLoop()
+	app := New(Deps{Post: loop.post, Secrets: secrets.NewWithBackend(&secrets.MemoryBackend{})}, settings.Instances{})
+	done := false
+	var inst settings.Instance
+	app.Connect(ConnectRequest{Address: srv.URL, Mode: settings.AuthPassword, Username: "jack", Password: "pw"}, func(in settings.Instance, err error) { inst, done = in, true })
+	loop.until(t, "connected", func() bool { return done })
+	cr, err := app.Secrets.Get(inst.ID)
+	if err != nil || cr.Password != "" || cr.Tokens == nil || cr.Username != "jack" {
+		t.Fatalf("stored %+v %v", cr, err)
+	}
+}
+
+func TestOldPasswordEntryIsRewritten(t *testing.T) {
+	e := setup(t, hermestest.Options{Username: "jack", Password: "pw"}, "")
+	// An entry from before: password and tokens together.
+	pa := &hermes.PasswordAuth{Username: "jack", Password: "pw"}
+	cl, _ := hermes.New(e.srv.URL, pa)
+	if err := pa.SignIn(context.Background(), cl); err != nil {
+		t.Fatal(err)
+	}
+	tk := pa.Tokens()
+	e.app.Secrets.Set("i1", secrets.Credentials{Username: "jack", Password: "pw", Tokens: &tk})
+	e.app.Open(e.inst)
+	e.loop.until(t, "connected", func() bool { return e.app.Conn.Synced })
+	cr, _ := e.app.Secrets.Get("i1")
+	if cr.Password != "" {
+		t.Fatal("the old password must be dropped")
 	}
 }
 
