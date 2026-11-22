@@ -24,3 +24,7 @@ coverage.out
 
 # Live recordings (may hold your chats)
 /testdata-live/
+/build/
+/build-update-test/
+build-update-test-changes.md
+mygo-update.key

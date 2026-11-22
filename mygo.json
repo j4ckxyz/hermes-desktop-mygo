@@ -1,0 +1,29 @@
+{
+  "name": "Hermes",
+  "slug": "hermes-desktop",
+  "identifier": "io.github.j4ckxyz.hermesdesktop",
+  "version": "0.1.0",
+  "copyright": "Copyright (c) 2026 j4ckxyz. MIT License.",
+  "license": "MIT",
+  "main": "./cmd/hermes-desktop",
+  "out": "build",
+  "macos": {
+    "minimumSystemVersion": "13.0"
+  },
+  "linux": {
+    "command": "hermes-desktop",
+    "comment": "A native desktop client for Hermes Agent",
+    "categories": ["Network", "Chat", "Utility"],
+    "webview": false,
+    "formats": ["deb"],
+    "depends": {
+      "deb": ["libepoxy0", "libsecret-1-0"],
+      "rpm": ["libepoxy.so.0()(64bit)", "libsecret-1.so.0()(64bit)"],
+      "arch": ["libepoxy", "libsecret"]
+    }
+  },
+  "updates": {
+    "publicKey": "qrFMusiddvmrCLsszn0d73MTvEnaqy+AeDqugR9sJtg=",
+    "github": "j4ckxyz/hermes-desktop-mygo"
+  }
+}

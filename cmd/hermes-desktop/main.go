@@ -27,7 +27,18 @@ import (
 	"hermes-desktop/internal/views"
 )
 
-var version = "0.1.0"
+// version is the version of a build that was not packaged (go build, make
+// build sets it from git); a packaged build has mygo.json's, which updates
+// compare.
+var version = "dev"
+
+// appVersion is the version of the app running.
+func appVersion() string {
+	if v := mygo.App.Version(); v != "" {
+		return v
+	}
+	return version
+}
 
 // demoSetup is set by main_demo.go (built with -tags demo): it starts an
 // in-process fake instance for screenshots and benchmarks.
@@ -121,8 +132,10 @@ func main() {
 	trace("main")
 	bench := os.Getenv("HERMES_DESKTOP_BENCH")
 	mygo.App.SetName("Hermes")
-	mygo.App.SetVersion(version)
-	views.Version = version
+	if mygo.App.Version() == "" {
+		mygo.App.SetVersion(version)
+	}
+	views.Version = appVersion()
 	loading := load()
 	fontsDone := make(chan error, 1)
 	go func() { err := theme.RegisterFonts(); trace("fonts registered"); fontsDone <- err }()
