@@ -142,6 +142,12 @@ func main() {
 	if commandLine(os.Args[1:]) {
 		return
 	}
+	// One Hermes at a time: a second launch hands over to the first,
+	// which comes forward (OnSecondInstance), and exits. Benchmarks and the
+	// demo run beside it.
+	if bench == "" && demoSetup == nil && !mygo.App.RequestSingleInstanceLock() {
+		return
+	}
 	loading := load()
 	fontsDone := make(chan error, 1)
 	go func() { err := theme.RegisterFonts(); trace("fonts registered"); fontsDone <- err }()
@@ -202,6 +208,23 @@ func main() {
 			native.chime(u.Settings.Sounds)
 			mygo.NewNotification(mygo.NotificationOptions{ID: n.ID(), Title: n.Title, Body: n.Body, Group: n.Chat}).Show()
 		}
+		// A second launch brings this window forward.
+		mygo.App.OnSecondInstance(func([]string, string) {
+			trace("second instance")
+			postMu.Lock()
+			w := win
+			postMu.Unlock()
+			if w == nil {
+				return // still opening: it shows by itself
+			}
+			w.Update(func() {
+				if w.IsMinimized() {
+					w.Restore()
+				}
+				w.Show()
+				w.Focus()
+			})
+		})
 		// Clicking a notification (also one from before a relaunch) brings
 		// the window forward and opens its chat.
 		mygo.App.OnNotificationClick(func(id string) {
