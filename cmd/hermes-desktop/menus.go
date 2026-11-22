@@ -18,25 +18,21 @@ func installMenus(win *mygo.Window, u *views.UI) {
 			win.Update(func() { u.Do(a) })
 		}
 	}
-	file := &mygo.MenuItem{Label: "File", Submenu: []*mygo.MenuItem{
-		{Label: "New Chat", Accelerator: "CmdOrCtrl+N", Click: act(views.ActionNewChat)},
-		{Label: "Search Chats…", Accelerator: "CmdOrCtrl+K", Click: act(views.ActionSearch)},
-		mygo.Separator(),
-		{Label: "Export Chat as Markdown…", Accelerator: "CmdOrCtrl+Shift+E", Click: act(views.ActionExport)},
-		{Label: "Add Instance…", Click: act(views.ActionAddInstance)},
-		mygo.Separator(),
-		{Role: mygo.RoleClose},
-	}}
+	// The app's own commands come from views.MenuCommands, which the
+	// tests also route keys through.
+	items := map[string][]*mygo.MenuItem{}
+	for _, mc := range views.MenuCommands() {
+		if mc.Separator {
+			items[mc.Menu] = append(items[mc.Menu], mygo.Separator())
+		}
+		items[mc.Menu] = append(items[mc.Menu], &mygo.MenuItem{Label: mc.Label, Accelerator: mc.Accelerator, Click: act(mc.Action)})
+	}
+	file := &mygo.MenuItem{Label: "File", Submenu: append(items["File"], mygo.Separator(), &mygo.MenuItem{Role: mygo.RoleClose})}
 	edit := &mygo.MenuItem{Label: "Edit", Submenu: []*mygo.MenuItem{
 		{Role: mygo.RoleUndo}, {Role: mygo.RoleRedo}, mygo.Separator(),
 		{Role: mygo.RoleCut}, {Role: mygo.RoleCopy}, {Role: mygo.RolePaste}, {Role: mygo.RoleSelectAll},
 	}}
-	chat := &mygo.MenuItem{Label: "Chat", Submenu: []*mygo.MenuItem{
-		{Label: "Stop Agent", Accelerator: "Esc", Click: act(views.ActionStop)},
-		{Label: "Refresh", Accelerator: "CmdOrCtrl+R", Click: act(views.ActionRefresh)},
-		mygo.Separator(),
-		{Label: "Show Chats", Accelerator: "CmdOrCtrl+0", Click: act(views.ActionShowChats)},
-	}}
+	chat := &mygo.MenuItem{Label: "Chat", Submenu: items["Chat"]}
 	view := &mygo.MenuItem{Label: "View", Submenu: []*mygo.MenuItem{
 		{Role: mygo.RoleResetZoom}, {Role: mygo.RoleZoomIn}, {Role: mygo.RoleZoomOut},
 		mygo.Separator(), {Role: mygo.RoleToggleFullScreen},
@@ -46,7 +42,7 @@ func installMenus(win *mygo.Window, u *views.UI) {
 			mygo.Shell.OpenExternal("https://hermes-agent.nousresearch.com/docs/")
 		}},
 	}}
-	settingsItem := &mygo.MenuItem{Label: "Settings…", Accelerator: "CmdOrCtrl+,", Click: act(views.ActionSettings)}
+	settingsItem := items["Settings"][0]
 
 	if runtime.GOOS == "darwin" {
 		app := &mygo.MenuItem{Label: "Hermes", Submenu: []*mygo.MenuItem{

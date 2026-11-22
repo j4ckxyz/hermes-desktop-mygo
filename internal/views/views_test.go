@@ -609,3 +609,66 @@ func TestHeaderClearsWindowButtons(t *testing.T) {
 		t.Fatal("settings title bar")
 	}
 }
+
+// press sends a key as the platform does with the app's menus installed:
+// a key that a menu item's accelerator claims runs that item's command,
+// and the view never sees it (docs/ui/input.md: "a key a menu item takes
+// goes to the menu, not the view").
+func (h *harness) press(mods ui.Modifiers, key ui.Key) {
+	for _, mc := range MenuCommands() {
+		if m, k, ok := ParseAccelerator(mc.Accelerator); ok && m == mods && k == key {
+			h.u.Do(mc.Action)
+			h.tt.Frame()
+			return
+		}
+	}
+	h.tt.Key(mods, key)
+	h.tt.Frame()
+}
+
+func TestEscWithMenusInstalled(t *testing.T) {
+	h := newHarness(t, hermestest.Options{}, true)
+	h.synced()
+	// Search opens from its menu accelerator and Esc closes it.
+	h.press(ui.Cmd, ui.KeyK)
+	if !h.u.search.open {
+		t.Fatal("Cmd+K opens search")
+	}
+	h.press(0, ui.KeyEscape)
+	if h.u.search.open {
+		t.Fatal("Esc must close search with the menus installed")
+	}
+	// Settings, and back.
+	h.press(ui.Cmd, ui.KeyComma)
+	if h.u.Screen != ScreenSettings {
+		t.Fatal("Cmd+, opens settings")
+	}
+	h.press(0, ui.KeyEscape)
+	if h.u.Screen != ScreenMain {
+		t.Fatal("Esc must leave settings with the menus installed")
+	}
+	// A rename, cancelled.
+	h.u.Select("20261122_060000_0a0b0c")
+	h.tt.Frame()
+	h.press(0, ui.KeyF2)
+	if h.u.renaming == "" {
+		t.Fatal("F2 starts a rename")
+	}
+	h.press(0, ui.KeyEscape)
+	if h.u.renaming != "" {
+		t.Fatal("Esc must cancel the rename with the menus installed")
+	}
+}
+
+func TestNoMenuClaimsEsc(t *testing.T) {
+	for _, mc := range MenuCommands() {
+		if _, k, ok := ParseAccelerator(mc.Accelerator); ok && k == ui.KeyEscape {
+			t.Fatalf("%q claims Esc: the view could no longer close search, settings or a rename", mc.Label)
+		}
+		if mc.Accelerator != "" {
+			if _, _, ok := ParseAccelerator(mc.Accelerator); !ok {
+				t.Fatalf("unparsed accelerator %q", mc.Accelerator)
+			}
+		}
+	}
+}
