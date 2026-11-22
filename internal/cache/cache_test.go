@@ -1,0 +1,198 @@
+package cache
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sync"
+	"testing"
+	"time"
+
+	"hermes-desktop/internal/hermes"
+	"hermes-desktop/internal/hermes/hermestest"
+)
+
+func openTemp(t *testing.T) (*Cache, string) {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "sub", "cache.db")
+	c, err := Open(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { c.Close() })
+	return c, p
+}
+
+// seedSessions converts the fake server's seed into client types, as a
+// sync would store them.
+func seedSessions(t *testing.T) ([]hermes.Profile, []hermes.Session, []hermes.Message) {
+	d := hermestest.DesignSeed(time.Now())
+	var ps []hermes.Profile
+	var ss []hermes.Session
+	var ms []hermes.Message
+	for _, v := range []struct {
+		in  any
+		out any
+	}{{d.Profiles, &ps}, {d.Sessions, &ss}, {d.Messages["20261122_080205_fb120f"], &ms}} {
+		data, _ := json.Marshal(v.in)
+		if err := json.Unmarshal(data, v.out); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return ps, ss, ms
+}
+
+func TestRoundTripAndReopen(t *testing.T) {
+	ctx := context.Background()
+	c, path := openTemp(t)
+	ps, ss, ms := seedSessions(t)
+	if err := c.PutProfiles(ctx, "inst1", ps); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.PutSessions(ctx, "inst1", ss, true); err != nil {
+		t.Fatal(err)
+	}
+	fetched := time.Now().Truncate(time.Millisecond)
+	if err := c.PutTranscript(ctx, "inst1", ss[0].ID, ms, fetched); err != nil {
+		t.Fatal(err)
+	}
+	c.Close()
+
+	// Reopen: what a cold launch reads before any network.
+	c2, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c2.Close()
+	gotP, _ := c2.Profiles(ctx, "inst1")
+	if len(gotP) != 3 || gotP[0].Title() != "Hermes" || gotP[2].Name != "helix" {
+		t.Fatalf("profiles %+v", gotP)
+	}
+	gotS, _ := c2.Sessions(ctx, "inst1")
+	if len(gotS) != len(ss) {
+		t.Fatalf("sessions %d want %d", len(gotS), len(ss))
+	}
+	for i := 1; i < len(gotS); i++ {
+		if gotS[i].Activity().After(gotS[i-1].Activity()) {
+			t.Fatal("not most recent first")
+		}
+	}
+	gotM, at, ok, err := c2.Transcript(ctx, "inst1", ss[0].ID)
+	if err != nil || !ok || len(gotM) != len(ms) || gotM[1].ToolCalls[0].ID != "call_0" {
+		t.Fatalf("transcript ok=%v n=%d err=%v", ok, len(gotM), err)
+	}
+	if d := at.Sub(fetched); d > time.Millisecond || d < -time.Millisecond {
+		t.Fatalf("fetched_at %v vs %v", at, fetched)
+	}
+	if _, _, ok, _ := c2.Transcript(ctx, "inst2", ss[0].ID); ok {
+		t.Fatal("instances must not share rows")
+	}
+}
+
+func TestReplaceDropsVanishedSessions(t *testing.T) {
+	ctx := context.Background()
+	c, _ := openTemp(t)
+	_, ss, ms := seedSessions(t)
+	c.PutSessions(ctx, "i", ss, true)
+	c.PutTranscript(ctx, "i", ss[1].ID, ms, time.Now())
+	// A full sync that no longer has ss[1] (deleted on another device).
+	keep := append([]hermes.Session{ss[0]}, ss[2:]...)
+	if err := c.PutSessions(ctx, "i", keep, true); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := c.Sessions(ctx, "i")
+	if len(got) != len(ss)-1 {
+		t.Fatalf("got %d", len(got))
+	}
+	if _, _, ok, _ := c.Transcript(ctx, "i", ss[1].ID); ok {
+		t.Fatal("the vanished session's transcript must go too")
+	}
+	// A partial upsert keeps the rest.
+	ss[0].Title = "Renamed"
+	c.PutSessions(ctx, "i", ss[:1], false)
+	got, _ = c.Sessions(ctx, "i")
+	if len(got) != len(ss)-1 || got[0].Title != "Renamed" {
+		t.Fatalf("upsert: %d %q", len(got), got[0].Title)
+	}
+	c.DeleteSession(ctx, "i", ss[0].ID)
+	if got, _ = c.Sessions(ctx, "i"); len(got) != len(ss)-2 {
+		t.Fatal("delete")
+	}
+	c.ForgetInstance(ctx, "i")
+	if got, _ = c.Sessions(ctx, "i"); len(got) != 0 {
+		t.Fatal("forget")
+	}
+}
+
+func TestCorruptFileIsReplaced(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "cache.db")
+	os.WriteFile(p, []byte("this is not a database, just junk bytes......................................................................................"), 0o600)
+	c, err := Open(p)
+	if err != nil {
+		t.Fatalf("corrupt cache must be rebuilt: %v", err)
+	}
+	defer c.Close()
+	if err := c.PutProfiles(context.Background(), "i", []hermes.Profile{{Name: "x"}}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestConcurrentWritersAndReaders(t *testing.T) {
+	ctx := context.Background()
+	c, _ := openTemp(t)
+	_, ss, ms := seedSessions(t)
+	var wg sync.WaitGroup
+	errs := make(chan error, 64)
+	for w := range 8 {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			for i := range 10 {
+				if err := c.PutTranscript(ctx, "i", fmt.Sprintf("s%d-%d", w, i), ms, time.Now()); err != nil {
+					errs <- err
+				}
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			if err := c.PutSessions(ctx, "i", ss[w*10:w*10+10], false); err != nil {
+				errs <- err
+			}
+			if _, err := c.Sessions(ctx, "i"); err != nil {
+				errs <- err
+			}
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
+	}
+	if got, _ := c.Sessions(ctx, "i"); len(got) != 80 {
+		t.Fatalf("got %d", len(got))
+	}
+}
+
+// BenchmarkColdRead is the cache's share of a cold launch: open the file
+// and read the sidebar (every session of the design seed).
+func BenchmarkColdRead(b *testing.B) {
+	ctx := context.Background()
+	p := filepath.Join(b.TempDir(), "cache.db")
+	c, _ := Open(p)
+	_, ss, _ := seedSessions(&testing.T{})
+	c.PutSessions(ctx, "i", ss, true)
+	c.Close()
+	b.ResetTimer()
+	for b.Loop() {
+		c, err := Open(p)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if got, _ := c.Sessions(ctx, "i"); len(got) != len(ss) {
+			b.Fatal(len(got))
+		}
+		c.Close()
+	}
+}
