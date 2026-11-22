@@ -26,6 +26,7 @@ chats so it never waits on the network to show you what you had.
 - [Settings](#settings)
 - [Your data](#your-data)
 - [Develop](#develop)
+- [License](#license)
 
 ## Install
 
@@ -300,3 +301,8 @@ machines:
 | `internal/theme`, `internal/settings` | design tokens, persisted Look & Feel |
 | `design/` | the design export the app follows |
 | `docs/` | the [Hermes API](docs/hermes-api.md) and [MyGo](docs/mygo-notes.md) notes, [benchmarks](docs/benchmarks.md), the [design comparison](docs/design-comparison.md) |
+
+## License
+
+[MIT](LICENSE). Hermes Agent is a separate project by Nous Research, under
+its own licence.
