@@ -2,8 +2,8 @@ package core
 
 import (
 	"context"
-	"fmt"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -633,5 +633,55 @@ func TestSyncPrunesTranscriptsToTheMostRecentlyOpened(t *testing.T) {
 	}
 	if _, _, ok, _ := e.app.Cache.Transcript(ctx, "other", "old0"); ok {
 		t.Fatal("the oldest goes")
+	}
+}
+
+func TestSessionsWithoutMessagesAreLeftOut(t *testing.T) {
+	seed := hermestest.DesignSeed(time.Now())
+	now := float64(time.Now().Unix())
+	for i := range 5 {
+		// Cron runs that said nothing: newer than every real chat.
+		seed.Sessions = append(seed.Sessions, map[string]any{"id": fmt.Sprint("cron_empty_", i), "title": "", "profile": "default",
+			"source": "cron", "started_at": now, "last_active": now, "message_count": 0})
+	}
+	e := setup(t, hermestest.Options{Canonical: true, Seed: &seed}, "")
+	e.app.Open(e.inst)
+	c := e.app.Conn
+	e.loop.until(t, "sync", func() bool { return c.Synced })
+	for _, s := range c.Sessions {
+		if s.MessageCount == 0 {
+			t.Fatalf("the instance listed an empty session: %s", s.ID)
+		}
+	}
+	// A cache from before this change holds empty sessions too: they are
+	// left out of the sidebar when it is read.
+	listed := len(c.Sessions)
+	stale := append([]hermes.Session(nil), c.Sessions...)
+	for i := range 3 {
+		stale = append(stale, hermes.Session{ID: fmt.Sprint("cached_empty_", i), Profile: "default", LastActive: hermes.Time{Time: time.Now()}})
+	}
+	c.setSessions(stale)
+	if len(c.Sessions) != listed {
+		t.Fatalf("cached empty sessions are listed: %d, want %d", len(c.Sessions), listed)
+	}
+	if e.srv.CallCount("GET /api/sessions") == 0 && e.srv.CallCount("GET /api/profiles/sessions") == 0 {
+		t.Fatal("no listing")
+	}
+}
+
+func TestANewChatStaysListedBeforeItsFirstMessageIsStored(t *testing.T) {
+	e := setup(t, hermestest.Options{Canonical: true, Reply: "design_turn.jsonl", Delay: 20 * time.Millisecond}, "")
+	e.app.Open(e.inst)
+	c := e.app.Conn
+	e.loop.until(t, "connected", func() bool { return c.Synced && c.ws != nil })
+	var created string
+	c.Send("", "default", "find my notes", func(id string) { created = id })
+	e.loop.until(t, "created", func() bool { return created != "" })
+	// The instance stores nothing until the turn ends; a sync meanwhile
+	// does not list the chat, and the sidebar keeps it all the same.
+	c.Refresh()
+	e.loop.until(t, "synced", func() bool { return !c.syncing.Load() && e.srv.CallCount("GET /api/profiles") >= 2 })
+	if _, ok := c.Session(created); !ok {
+		t.Fatal("the new chat left the sidebar")
 	}
 }

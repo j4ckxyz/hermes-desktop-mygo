@@ -270,10 +270,14 @@ func (s *Server) listSessions(w http.ResponseWriter, r *http.Request) {
 		limit = 20
 	}
 	profile := q.Get("profile")
+	minMessages, _ := strconv.Atoi(q.Get("min_messages"))
 	s.mu.Lock()
 	var rows []map[string]any
 	for _, row := range s.data.Sessions {
 		if profile != "" && profile != "all" && row["profile"] != profile {
+			continue
+		}
+		if count(row["message_count"]) < minMessages {
 			continue
 		}
 		if row["archived"] == true {
@@ -286,6 +290,17 @@ func (s *Server) listSessions(w http.ResponseWriter, r *http.Request) {
 	total := len(rows)
 	rows = rows[min(offset, total):min(offset+limit, total)]
 	writeJSON(w, 200, map[string]any{"sessions": rows, "total": total, "limit": limit, "offset": offset})
+}
+
+// count reads a JSON-ish number, as the seed's ints or decoded float64s.
+func count(v any) int {
+	switch n := v.(type) {
+	case int:
+		return n
+	case float64:
+		return int(n)
+	}
+	return 0
 }
 
 func num(v any) float64 {
@@ -809,6 +824,7 @@ func (s *Server) persist(id, user, reply string) {
 	if row, _ := s.findSession(id); row != nil {
 		row["last_active"] = now
 		row["is_active"] = false
+		row["message_count"] = count(row["message_count"]) + 2
 	}
 }
 

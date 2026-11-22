@@ -12,6 +12,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -526,8 +527,37 @@ func (c *Connection) setProfiles(ps []hermes.Profile) {
 	c.Rev++
 }
 
+// startedHere reports whether this app is working in a session: a chat
+// just started, whose first message the instance may not have stored yet.
+func (c *Connection) startedHere(id string) bool {
+	ch := c.Chats[id]
+	return ch != nil && (ch.Running() || len(ch.Live.Turns) > 0)
+}
+
+// setSessions replaces the session list. Sessions without a message (cron
+// runs that said nothing, a terminal opened and left) are left out, as the
+// instance's own apps leave them out (min_messages=1), and so are any the
+// cache kept from before; a chat started here stays while the listing
+// catches up with it.
 func (c *Connection) setSessions(ss []hermes.Session) {
 	c.Rev++
+	counted := slices.ContainsFunc(ss, func(s hermes.Session) bool { return s.MessageCount > 0 })
+	kept := make([]hermes.Session, 0, len(ss))
+	seen := make(map[string]bool, len(ss))
+	for _, s := range ss {
+		if seen[s.ID] || (counted && s.MessageCount == 0 && !c.startedHere(s.ID)) {
+			continue
+		}
+		seen[s.ID] = true
+		kept = append(kept, s)
+	}
+	for _, s := range c.Sessions {
+		if !seen[s.ID] && c.startedHere(s.ID) {
+			seen[s.ID] = true
+			kept = append(kept, s)
+		}
+	}
+	ss = kept
 	sort.SliceStable(ss, func(i, j int) bool { return ss[i].Activity().After(ss[j].Activity()) })
 	c.Sessions = ss
 	for _, s := range ss {

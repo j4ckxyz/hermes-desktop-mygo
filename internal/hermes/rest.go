@@ -236,7 +236,7 @@ type SessionQuery struct {
 func (c *Client) Sessions(ctx context.Context, sq SessionQuery) (SessionPage, error) {
 	q := url.Values{
 		"limit": {strconv.Itoa(max(1, min(sq.Limit, 100)))}, "offset": {strconv.Itoa(sq.Offset)},
-		"min_messages": {"0"}, "archived": {"exclude"}, "order": {"recent"}, "full": {"false"},
+		"min_messages": {"1"}, "archived": {"exclude"}, "order": {"recent"}, "full": {"false"},
 	}
 	if sq.Profile != "" {
 		q.Set("profile", sq.Profile)
@@ -250,7 +250,7 @@ func (c *Client) Sessions(ctx context.Context, sq SessionQuery) (SessionPage, er
 func (c *Client) AllSessions(ctx context.Context, limit, offset int) (SessionPage, error) {
 	q := url.Values{
 		"limit": {strconv.Itoa(max(1, min(limit, 500)))}, "offset": {strconv.Itoa(offset)},
-		"order": {"recent"}, "profile": {"all"}, "min_messages": {"0"}, "archived": {"exclude"},
+		"order": {"recent"}, "profile": {"all"}, "min_messages": {"1"}, "archived": {"exclude"},
 	}
 	var p SessionPage
 	err := c.do(ctx, http.MethodGet, "/api/profiles/sessions", q, nil, &p)
