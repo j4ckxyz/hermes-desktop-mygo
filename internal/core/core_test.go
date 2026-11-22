@@ -577,3 +577,31 @@ func TestNoticesNameTheirChat(t *testing.T) {
 		t.Fatal("foreign ids are not ours")
 	}
 }
+
+func TestWakeReconnectsWithoutWaitingOutTheBackoff(t *testing.T) {
+	old := reconnectBackoff
+	reconnectBackoff = []time.Duration{time.Hour}
+	t.Cleanup(func() { reconnectBackoff = old })
+	e := setup(t, hermestest.Options{}, "")
+	e.app.Open(e.inst)
+	c := e.app.Conn
+	e.loop.until(t, "connected", func() bool { return c.ws != nil && c.Status == Connected })
+	first := c.wsGen
+	// The network drops: the socket waits an hour before trying again...
+	e.srv.CloseSockets()
+	e.loop.until(t, "offline", func() bool { return c.Status == Offline })
+	time.Sleep(50 * time.Millisecond)
+	if c.Status != Offline {
+		t.Fatal("no new attempt before the backoff ends")
+	}
+	// ...unless the network comes back.
+	e.app.Wake(false)
+	e.loop.until(t, "reconnected", func() bool { return c.Status == Connected && c.wsGen > first })
+
+	// After sleep, the socket that looks open is dialled again.
+	second := c.wsGen
+	syncs := e.srv.CallCount("GET /api/profiles")
+	e.app.Wake(true)
+	e.loop.until(t, "redialled", func() bool { return c.Status == Connected && c.wsGen > second })
+	e.loop.until(t, "synced again", func() bool { return e.srv.CallCount("GET /api/profiles") > syncs })
+}

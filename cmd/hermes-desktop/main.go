@@ -208,6 +208,18 @@ func main() {
 			native.chime(u.Settings.Sounds)
 			mygo.NewNotification(mygo.NotificationOptions{ID: n.ID(), Title: n.Title, Body: n.Body, Group: n.Chat}).Show()
 		}
+		// Back from sleep, or back online: reconnect now rather than at the
+		// end of the backoff.
+		mygo.Power.OnResume(func() {
+			trace("resumed")
+			post(func() { app.Wake(true) })
+		})
+		mygo.Network.OnChanged(func(st mygo.NetworkStatus) {
+			if st.Online {
+				trace("online")
+				post(func() { app.Wake(false) })
+			}
+		})
 		// A second launch brings this window forward.
 		mygo.App.OnSecondInstance(func([]string, string) {
 			trace("second instance")

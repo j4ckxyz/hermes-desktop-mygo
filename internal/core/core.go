@@ -143,8 +143,11 @@ type Connection struct {
 	cancel  context.CancelFunc
 	client  atomic.Pointer[hermes.Client] // for goroutines; Client is the UI's copy
 	syncing atomic.Bool
-	ws      *hermes.Conn
-	wsGen   int
+	// syncAgain asks the running sync for another pass when it ends.
+	syncAgain atomic.Bool
+	ws        *hermes.Conn
+	wake      chan struct{} // Wake: stop waiting and dial now
+	wsGen     int
 
 	evmu     sync.Mutex
 	evq      []any // hermes.Event or hermes.ServerRequest
@@ -211,7 +214,7 @@ func (a *App) OpenWith(inst settings.Instance, pre *Preload) {
 		a.Conn.Close()
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	c := &Connection{app: a, Instance: inst, ctx: ctx, cancel: cancel, Running: map[string]bool{}, Chats: map[string]*Chat{}, Totals: map[string]int{}}
+	c := &Connection{app: a, Instance: inst, ctx: ctx, cancel: cancel, Running: map[string]bool{}, Chats: map[string]*Chat{}, Totals: map[string]int{}, wake: make(chan struct{}, 1)}
 	a.Conn = c
 	if pre != nil {
 		c.setProfiles(pre.Profiles)
@@ -370,9 +373,17 @@ const (
 // showing each page as it comes and caching them.
 func (c *Connection) sync() bool {
 	if !c.syncing.CompareAndSwap(false, true) {
-		return false // one sync at a time
+		// One sync at a time: the one running goes again when it ends, so
+		// what asked for this one (a wake, a reconnect) is not lost.
+		c.syncAgain.Store(true)
+		return false
 	}
-	defer c.syncing.Store(false)
+	defer func() {
+		c.syncing.Store(false)
+		if c.syncAgain.Swap(false) && c.ctx.Err() == nil {
+			go c.sync()
+		}
+	}()
 	cl := c.client.Load()
 	if cl == nil {
 		return false
@@ -652,12 +663,44 @@ func (c *Connection) subscribe(ch *Chat) {
 
 // ---- the socket ----
 
+// reconnectBackoff is how long the socket waits before each new attempt
+// (tests lengthen it); Wake cuts the wait short.
+var reconnectBackoff = []time.Duration{time.Second, 2 * time.Second, 5 * time.Second, 10 * time.Second, 30 * time.Second}
+
+// Wake reconnects at once instead of waiting out the backoff, when the
+// computer wakes from sleep or comes back online. After sleep (resumed)
+// the socket that seems open is likely dead, so it is dialled again too,
+// and the sidebar synced. Call it on the UI thread.
+func (c *Connection) Wake(resumed bool) {
+	select {
+	case c.wake <- struct{}{}:
+	default:
+	}
+	if resumed {
+		if ws := c.ws; ws != nil {
+			ws.Close()
+		}
+	}
+	if c.Status != SignedOut {
+		go c.sync()
+	}
+}
+
+// Wake wakes the open instance's connection (see Connection.Wake).
+func (a *App) Wake(resumed bool) {
+	if a.Conn != nil {
+		a.Conn.Wake(resumed)
+	}
+}
+
 func (c *Connection) dialLoop(cl *hermes.Client) {
-	backoff := []time.Duration{time.Second, 2 * time.Second, 5 * time.Second, 10 * time.Second, 30 * time.Second}
+	backoff := reconnectBackoff
+	connectedBefore := false
 	for attempt := 0; c.ctx.Err() == nil; attempt++ {
 		ws, err := cl.Dial(c.ctx, c, c.app.Dial)
 		if err == nil {
-			first := attempt == 0
+			first := !connectedBefore
+			connectedBefore = true
 			c.post(func() {
 				c.ws = ws
 				c.wsGen++
@@ -694,6 +737,8 @@ func (c *Connection) dialLoop(cl *hermes.Client) {
 		d := backoff[min(attempt, len(backoff)-1)]
 		select {
 		case <-time.After(d):
+		case <-c.wake:
+			attempt = -1 // woken: start the backoff over
 		case <-c.ctx.Done():
 			return
 		}
