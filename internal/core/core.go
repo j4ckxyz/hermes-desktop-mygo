@@ -86,6 +86,9 @@ type App struct {
 	// LinkPreviews lets link cards fetch their page's title.
 	LinkPreviews bool
 	links        linkTitles
+	// background lists background runs (cron, subagents) in the sidebar
+	// and search; syncs read it off the UI thread.
+	background atomic.Bool
 }
 
 // New returns the app with its saved instances.
@@ -94,6 +97,23 @@ func New(d Deps, instances settings.Instances) *App {
 		d.Now = time.Now
 	}
 	return &App{Deps: d, Instances: instances}
+}
+
+// ShowBackground reports whether background runs are listed.
+func (a *App) ShowBackground() bool { return a.background.Load() }
+
+// SetShowBackground lists background runs again, or hides them. Nothing
+// on the instance changes: hiding is only a filter.
+func (a *App) SetShowBackground(on bool) {
+	if a.background.Swap(on) == on {
+		return
+	}
+	if c := a.Conn; c != nil {
+		c.setSessions(c.Sessions)
+		// The rows hidden so far were never fetched: read every page.
+		c.fullNext.Store(on)
+		c.Refresh()
+	}
 }
 
 // Toast queues a message for the view.
@@ -147,9 +167,13 @@ type Connection struct {
 	syncing atomic.Bool
 	// syncAgain asks the running sync for another pass when it ends.
 	syncAgain atomic.Bool
-	ws        *hermes.Conn
-	wake      chan struct{} // Wake: stop waiting and dial now
-	wsGen     int
+	// fullNext makes the next sync read every page.
+	fullNext atomic.Bool
+	// viewing is the chat last opened, which stays listed whatever it is.
+	viewing string
+	ws      *hermes.Conn
+	wake    chan struct{} // Wake: stop waiting and dial now
+	wsGen   int
 
 	evmu     sync.Mutex
 	evq      []any // hermes.Event or hermes.ServerRequest
@@ -390,6 +414,7 @@ func (c *Connection) sync() bool {
 	if cl == nil {
 		return false
 	}
+	bg := c.app.ShowBackground()
 	me, _ := cl.Me(c.ctx)
 	ps, err := cl.Profiles(c.ctx)
 	if err != nil {
@@ -407,7 +432,7 @@ func (c *Connection) sync() bool {
 		defer close(totalsDone)
 		totals := map[string]int{}
 		for _, p := range ps {
-			if page, err := cl.Sessions(c.ctx, hermes.SessionQuery{Profile: p.Name, Limit: 1}); err == nil {
+			if page, err := cl.Sessions(c.ctx, hermes.SessionQuery{Profile: p.Name, Limit: 1, Background: bg}); err == nil {
 				totals[p.Name] = page.Total
 			}
 		}
@@ -426,10 +451,13 @@ func (c *Connection) sync() bool {
 			full = c.app.Now().Sub(last) > fullSyncEvery
 		}
 	}
+	if c.fullNext.Swap(false) {
+		full = true
+	}
 	var all []hermes.Session
 	complete := false
 	for offset, limit := 0, firstPage; ; limit = nextPage {
-		page, err := cl.AllSessions(c.ctx, limit, offset)
+		page, err := cl.AllSessionsQuery(c.ctx, hermes.SessionQuery{Limit: limit, Offset: offset, Background: bg})
 		if err != nil {
 			c.failed(err)
 			return false
@@ -463,6 +491,23 @@ func (c *Connection) sync() bool {
 		if done {
 			complete = full && offset >= page.Total
 			break
+		}
+	}
+	if !bg {
+		// Pinned background runs stay listed, but the listing's back-fill of
+		// pins obeys exclude_sources: ask for them on their own.
+		if page, err := cl.AllSessionsQuery(c.ctx, hermes.SessionQuery{Limit: 50, Sources: hermes.BackgroundSources}); err == nil {
+			var pins []hermes.Session
+			for _, s := range page.Sessions {
+				if s.Pinned {
+					pins = append(pins, s)
+				}
+			}
+			all = append(all, pins...)
+			if c.app.Cache != nil {
+				c.app.Cache.PutSessions(c.ctx, c.Instance.ID, pins, false)
+			}
+			c.post(func() { c.mergeSessions(pins) })
 		}
 	}
 	if c.app.Cache != nil {
@@ -534,18 +579,22 @@ func (c *Connection) startedHere(id string) bool {
 	return ch != nil && (ch.Running() || len(ch.Live.Turns) > 0)
 }
 
-// setSessions replaces the session list. Sessions without a message (cron
-// runs that said nothing, a terminal opened and left) are left out, as the
-// instance's own apps leave them out (min_messages=1), and so are any the
-// cache kept from before; a chat started here stays while the listing
-// catches up with it.
+// setSessions replaces the session list. Left out, as the instance's own
+// apps leave them out:
+//   - sessions without a message (cron runs that said nothing, a terminal
+//     opened and left), and any with nothing at all to show;
+//   - background runs (cron, subagents), unless they are listed on purpose.
+//
+// The same goes for rows a cache from an older build kept. A chat started
+// here stays while the listing catches up with it, and a pinned or open
+// session stays whatever its source.
 func (c *Connection) setSessions(ss []hermes.Session) {
 	c.Rev++
 	counted := slices.ContainsFunc(ss, func(s hermes.Session) bool { return s.MessageCount > 0 })
 	kept := make([]hermes.Session, 0, len(ss))
 	seen := make(map[string]bool, len(ss))
 	for _, s := range ss {
-		if seen[s.ID] || (counted && s.MessageCount == 0 && !c.startedHere(s.ID)) {
+		if seen[s.ID] || (!c.startedHere(s.ID) && c.hidden(s, counted)) {
 			continue
 		}
 		seen[s.ID] = true
@@ -567,6 +616,36 @@ func (c *Connection) setSessions(ss []hermes.Session) {
 			delete(c.Running, s.ID)
 		}
 	}
+}
+
+// hidden reports whether the sidebar leaves a session out (see setSessions);
+// counted is whether its listing carries message counts.
+func (c *Connection) hidden(s hermes.Session, counted bool) bool {
+	if s.Blank() {
+		return true
+	}
+	kept := s.Pinned || s.ID == c.viewing
+	if counted && s.MessageCount == 0 && !kept {
+		return true
+	}
+	return s.Background() && !kept && !c.app.ShowBackground()
+}
+
+// Title is the name a session is listed under: its title or preview, else
+// the first message sent from here, else "New chat". A row with nothing to
+// show is only listed while a chat started here waits to be stored.
+func (c *Connection) Title(s hermes.Session) string {
+	if !s.Blank() {
+		return s.DisplayTitle()
+	}
+	if ch := c.Chats[s.ID]; ch != nil {
+		for _, t := range ch.Live.Turns {
+			if u := strings.TrimSpace(t.User); u != "" {
+				return hermes.Session{Preview: u}.DisplayTitle()
+			}
+		}
+	}
+	return "New chat"
 }
 
 // Session returns a session's row.
@@ -607,6 +686,7 @@ func (c *Connection) chat(id, profile string) *Chat {
 // (off the UI thread), and fetches the latest transcript and attaches the
 // socket in the background.
 func (c *Connection) OpenChat(id string) *Chat {
+	c.viewing = id
 	ch := c.chat(id, "")
 	if !ch.Loading {
 		ch.Loading = true
@@ -1199,7 +1279,12 @@ func (c *Connection) Search(q string, done func([]hermes.SearchResult, error)) {
 		return
 	}
 	go func() {
-		res, err := cl.Search(c.ctx, "", q, 30)
+		bg := c.app.ShowBackground()
+		res, err := cl.Search(c.ctx, "", q, 30, bg)
+		if !bg {
+			// An instance that ignores exclude_sources still tags each result.
+			res = slices.DeleteFunc(res, func(r hermes.SearchResult) bool { return hermes.IsBackgroundSource(r.Source) })
+		}
 		c.post(func() { done(res, err) })
 	}()
 }

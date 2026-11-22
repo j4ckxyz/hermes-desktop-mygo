@@ -233,6 +233,13 @@ func (u *UI) sidebarView(c *ui.Context, conn *core.Connection) {
 						}
 					}
 					m.Separator()
+					if m.Item("Show background runs").Checked(u.Settings.ShowBackgroundRuns).
+						Tooltip("Cron runs and subagents, beside your chats").Chosen() {
+						s := u.Settings
+						s.ShowBackgroundRuns = !s.ShowBackgroundRuns
+						u.SetSettings(s)
+					}
+					m.Separator()
 					if m.Item("Refresh").Chosen() {
 						conn.Refresh()
 					}
@@ -437,9 +444,15 @@ func (u *UI) sessionRow(c *ui.Context, conn *core.Connection, r sideRow, now int
 	s := conn.Sessions[r.sess]
 	selected := s.ID == u.Selected && u.Screen == ScreenMain
 	running := conn.Running[s.ID]
+	title := conn.Title(s)
+	label := title
+	if s.Background() {
+		src := strings.ToLower(s.Source)
+		label = strings.ToUpper(src[:1]) + src[1:] + " run: " + title
+	}
 	row := ui.Row(c).MarginStart(24).BorderWidth(0, 0, 0, 1.5).BorderColor(pal.Line2).
 		Gap(8).Padding(9, 10, 9, 0).AlignItems(ui.Center).Cursor(ui.CursorPointer).
-		Focusable().Label(s.DisplayTitle()).AccessSelected(selected)
+		Focusable().Label(label).AccessSelected(selected)
 	switch {
 	case selected:
 		row.Background(pal.Surf).Radius(0, 12, 12, 0)
@@ -461,9 +474,12 @@ func (u *UI) sessionRow(c *ui.Context, conn *core.Connection, r sideRow, now int
 			}
 			return
 		}
-		t := ui.Text(c, s.DisplayTitle()).FontSize(14).TextColor(pal.Text).Grow(1).Shrink(1).MinWidth(0).SingleLine().Ellipsis("…")
+		t := ui.Text(c, title).FontSize(14).TextColor(pal.Text).Grow(1).Shrink(1).MinWidth(0).SingleLine().Ellipsis("…")
 		if selected {
 			t.FontWeight(600)
+		}
+		if s.Background() {
+			sourceBadge(c, pal, s.Source)
 		}
 		if s.Unread && !selected {
 			ui.Box(c).Size(8, 8).Radius(4).Background(pal.Accent).Shrink(0).Label("Unread").Role(ui.RoleImage)
@@ -492,6 +508,12 @@ func (u *UI) sessionRow(c *ui.Context, conn *core.Connection, r sideRow, now int
 		u.renaming, u.renameText = s.ID, s.Title
 	}
 	row.ContextMenu(func(m *ui.Menu) { u.sessionMenu(c, m, conn, s) })
+}
+
+// sourceBadge marks a background run with its source ("cron", "subagent").
+func sourceBadge(c *ui.Context, pal *theme.Palette, source string) {
+	ui.Text(c, strings.ToLower(source)).FontSize(11).FontWeight(600).TextColor(pal.Muted).
+		Padding(1, 6).Radius(6).Border(1, pal.Line2).Shrink(0)
 }
 
 // sessionMenu is the menu of a session, in the sidebar and the chat header.

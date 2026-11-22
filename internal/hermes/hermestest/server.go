@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -77,6 +78,9 @@ type Options struct {
 	Seed *Data
 	// Addr is the address to listen on ("" is a loopback port).
 	Addr string
+	// IgnoreSearchSources makes search ignore its source parameters, as an
+	// older instance might.
+	IgnoreSearchSources bool
 }
 
 // Data is the instance's content.
@@ -102,7 +106,8 @@ type Server struct {
 	revision map[string]int64
 	sockets  []*socket
 	// Calls counts requests by "METHOD path" (REST) and method (RPC).
-	Calls map[string]int
+	Calls   map[string]int
+	queries map[string][]url.Values
 	// Submitted records the prompts sent, by session.
 	Submitted map[string][]string
 	// Responses records the client's answers to server requests, by id.
@@ -121,7 +126,7 @@ func New(opt Options) *Server {
 	s := &Server{
 		opt: opt, tickets: map[string]bool{}, codes: map[string]string{}, pkce: map[string]string{},
 		access: map[string]bool{}, refresh: map[string]bool{}, cookies: map[string]bool{}, revision: map[string]int64{},
-		Calls: map[string]int{}, Submitted: map[string][]string{}, Responses: map[string]json.RawMessage{},
+		Calls: map[string]int{}, queries: map[string][]url.Values{}, Submitted: map[string][]string{}, Responses: map[string]json.RawMessage{},
 	}
 	if opt.Seed != nil {
 		s.data = *opt.Seed
@@ -143,10 +148,18 @@ func New(opt Options) *Server {
 	return s
 }
 
-func (s *Server) count(k string) {
+func (s *Server) count(k string, q url.Values) {
 	s.mu.Lock()
 	s.Calls[k]++
+	s.queries[k] = append(s.queries[k], q)
 	s.mu.Unlock()
+}
+
+// Queries returns the query of every call to k, in order.
+func (s *Server) Queries(k string) []url.Values {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.queries[k])
 }
 
 // CallCount returns how many times k was called.
@@ -183,7 +196,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(s.opt.Latency)
 	}
 	path := r.URL.Path
-	s.count(r.Method + " " + routeKey(path))
+	s.count(r.Method+" "+routeKey(path), r.URL.Query())
 	if r.Header.Get("Origin") != "" {
 		http.Error(w, "unexpected Origin", http.StatusForbidden) // the client must send none
 		return
@@ -271,13 +284,14 @@ func (s *Server) listSessions(w http.ResponseWriter, r *http.Request) {
 	}
 	profile := q.Get("profile")
 	minMessages, _ := strconv.Atoi(q.Get("min_messages"))
+	match := sourceFilter(q)
 	s.mu.Lock()
 	var rows []map[string]any
 	for _, row := range s.data.Sessions {
 		if profile != "" && profile != "all" && row["profile"] != profile {
 			continue
 		}
-		if count(row["message_count"]) < minMessages {
+		if count(row["message_count"]) < minMessages || !match(row) {
 			continue
 		}
 		if row["archived"] == true {
@@ -290,6 +304,32 @@ func (s *Server) listSessions(w http.ResponseWriter, r *http.Request) {
 	total := len(rows)
 	rows = rows[min(offset, total):min(offset+limit, total)]
 	writeJSON(w, 200, map[string]any{"sessions": rows, "total": total, "limit": limit, "offset": offset})
+}
+
+// sourceFilter is the listings' and search's source, sources (CSV) and
+// exclude_sources (CSV) parameters.
+func sourceFilter(q url.Values) func(row map[string]any) bool {
+	csv := func(k string) []string {
+		var out []string
+		for _, v := range strings.Split(q.Get(k), ",") {
+			if v = strings.TrimSpace(v); v != "" {
+				out = append(out, v)
+			}
+		}
+		return out
+	}
+	only := csv("sources")
+	if v := q.Get("source"); v != "" {
+		only = []string{v}
+	}
+	exclude := csv("exclude_sources")
+	return func(row map[string]any) bool {
+		src, _ := row["source"].(string)
+		if len(only) > 0 {
+			return slices.Contains(only, src)
+		}
+		return !slices.Contains(exclude, src)
+	}
 }
 
 // count reads a JSON-ish number, as the seed's ints or decoded float64s.
@@ -310,13 +350,15 @@ func num(v any) float64 {
 
 func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 	q := strings.ToLower(r.URL.Query().Get("q"))
+	match := sourceFilter(r.URL.Query())
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	res := []any{}
 	for _, row := range s.data.Sessions {
 		title, _ := row["title"].(string)
-		if q != "" && strings.Contains(strings.ToLower(title), q) {
-			res = append(res, map[string]any{"session_id": row["id"], "title": title, "snippet": title, "profile": row["profile"], "last_active": row["last_active"]})
+		if q != "" && strings.Contains(strings.ToLower(title), q) && (s.opt.IgnoreSearchSources || match(row)) {
+			res = append(res, map[string]any{"session_id": row["id"], "title": title, "snippet": title, "profile": row["profile"],
+				"source": row["source"], "last_active": row["last_active"]})
 		}
 	}
 	writeJSON(w, 200, map[string]any{"results": res})
@@ -654,7 +696,7 @@ func (k *socket) serve() {
 			k.s.mu.Unlock()
 			continue
 		}
-		k.s.count(f.Method)
+		k.s.count(f.Method, nil)
 		res, rerr := k.handle(f.Method, f.Params)
 		reply := map[string]any{"jsonrpc": "2.0", "id": f.ID}
 		if rerr != nil {

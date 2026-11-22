@@ -139,6 +139,7 @@ func (u *UI) View(c *ui.Context) {
 	pal := &u.pal
 
 	u.App.LinkPreviews = u.Settings.LinkPreviews
+	u.App.SetShowBackground(u.Settings.ShowBackgroundRuns)
 	u.keys(c)
 	if u.SidebarShown != nil && u.sidebarDrawn == 1 {
 		u.sidebarDrawn = 2

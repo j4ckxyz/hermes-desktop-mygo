@@ -739,3 +739,40 @@ func TestPlainHTTPWarning(t *testing.T) {
 		t.Fatal("no question for this machine")
 	}
 }
+
+func TestBackgroundRunsToggle(t *testing.T) {
+	seed := hermestest.DesignSeed(time.Now())
+	hermestest.AddBackgroundRuns(&seed, time.Now())
+	h := newHarness(t, hermestest.Options{Canonical: true, Seed: &seed}, true)
+	h.synced()
+	const cronPreview = "Run the morning brief and post it to Telegram"
+	for _, s := range []string{hermestest.UntitledText, hermestest.PinnedTitle, "cron"} {
+		if !h.tt.HasText(s) {
+			t.Errorf("sidebar is missing %q", s)
+		}
+	}
+	for _, s := range []string{cronPreview, "Find fieldwork pages", "subagent"} {
+		if h.tt.HasText(s) {
+			t.Errorf("sidebar shows the background run %q", s)
+		}
+	}
+	if err := h.tt.Click("Filter sessions"); err != nil {
+		t.Fatal(err)
+	}
+	if items := strings.Join(h.tt.Menu(), "|"); !strings.Contains(items, "Show background runs") {
+		t.Fatalf("filter menu: %s", items)
+	}
+	if err := h.tt.ChooseMenuItem("Show background runs"); err != nil {
+		t.Fatal(err)
+	}
+	h.settle("background runs shown", func() bool { return h.tt.HasText(cronPreview) && h.tt.HasText("subagent") })
+	if len(h.saved) == 0 || !h.saved[len(h.saved)-1].ShowBackgroundRuns {
+		t.Fatal("the choice is saved")
+	}
+	h.tt.Click("Filter sessions")
+	h.tt.ChooseMenuItem("Show background runs")
+	h.settle("background runs hidden", func() bool { return !h.tt.HasText(cronPreview) })
+	if !h.tt.HasText(hermestest.PinnedTitle) {
+		t.Error("a pinned cron run stays listed")
+	}
+}

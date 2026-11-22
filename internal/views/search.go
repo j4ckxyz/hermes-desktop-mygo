@@ -29,7 +29,7 @@ func (s *searchState) toggle() {
 }
 
 type hit struct {
-	id, title, sub, profile string
+	id, title, sub, profile, source string
 }
 
 // results are the local matches, then the instance's, deduplicated.
@@ -45,10 +45,10 @@ func (u *UI) searchResults() []hit {
 		if len(out) >= 12 {
 			break
 		}
-		t := s.DisplayTitle()
+		t := conn.Title(s)
 		if q == "" || strings.Contains(strings.ToLower(t), q) || strings.HasPrefix(s.ID, q) {
 			prof, _ := conn.Profile(s.Profile)
-			out = append(out, hit{id: s.ID, title: t, sub: prof.Title(), profile: s.Profile})
+			out = append(out, hit{id: s.ID, title: t, sub: prof.Title(), profile: s.Profile, source: backgroundSource(s.Source)})
 			seen[s.ID] = true
 		}
 	}
@@ -60,15 +60,23 @@ func (u *UI) searchResults() []hit {
 			seen[r.SessionID] = true
 			title := r.Title
 			if s, ok := conn.Session(r.SessionID); ok {
-				title = s.DisplayTitle()
+				title = conn.Title(s)
 			}
 			if title == "" {
 				title = r.SessionID
 			}
-			out = append(out, hit{id: r.SessionID, title: title, sub: strings.TrimSpace(r.Snippet), profile: r.Profile})
+			out = append(out, hit{id: r.SessionID, title: title, sub: strings.TrimSpace(r.Snippet), profile: r.Profile, source: backgroundSource(r.Source)})
 		}
 	}
 	return out
+}
+
+// backgroundSource is a background run's source, for its badge, or "".
+func backgroundSource(source string) string {
+	if hermes.IsBackgroundSource(source) {
+		return source
+	}
+	return ""
 }
 
 func (u *UI) searchView(c *ui.Context) {
@@ -137,6 +145,9 @@ func (u *UI) searchView(c *ui.Context) {
 								ui.Text(c, h.sub).FontSize(12).TextColor(pal.Muted).SingleLine().Ellipsis("…")
 							}
 						})
+						if h.source != "" {
+							sourceBadge(c, pal, h.source)
+						}
 						if conn != nil && conn.Running[h.id] {
 							Loader(c, u.Settings.Loader, pal, false)
 						}

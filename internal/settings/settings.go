@@ -47,6 +47,10 @@ type Settings struct {
 	// LinkPreviews fetches the titles of links in replies.
 	LinkPreviews bool `json:"linkPreviews"`
 
+	// ShowBackgroundRuns lists the sessions no one chatted in (cron runs,
+	// subagents) beside the conversations, in the sidebar and in search.
+	ShowBackgroundRuns bool `json:"showBackgroundRuns,omitempty"`
+
 	// AutoUpdate checks for new versions as the app opens and every few
 	// hours, and downloads the ones released while it runs.
 	AutoUpdate bool `json:"autoUpdate"`

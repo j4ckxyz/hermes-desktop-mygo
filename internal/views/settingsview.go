@@ -518,6 +518,12 @@ func (u *UI) generalPane(c *ui.Context) {
 			u.SetSettings(n)
 		})
 		u.note(c, "Link cards in replies show the page's title, fetched once, without cookies, and only from public addresses (or your instance's own).")
+		u.toggleRow(c, "Show background runs", &s.ShowBackgroundRuns, func(v bool) {
+			n := u.Settings
+			n.ShowBackgroundRuns = v
+			u.SetSettings(n)
+		})
+		u.note(c, "Cron runs and subagents are listed beside your chats, in the sidebar and in search, each marked with its source. Off, they are only hidden: nothing is deleted, and a pinned or open one stays listed.")
 		if u.Native != nil && u.Native.Platform() != "darwin" {
 			u.note(c, "Menus: press Alt or F10 to open File, Edit, Chat, View and Help.")
 		}

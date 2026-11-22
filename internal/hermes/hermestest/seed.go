@@ -82,3 +82,40 @@ func DesignSeed(now time.Time) Data {
 	}
 	return d
 }
+
+// Background-run fixtures, for AddBackgroundRuns.
+const (
+	UntitledChat  = "20261122_074500_7a7b7c" // a gui chat with no title: listed by its preview
+	UntitledText  = "What is the tide at Croyde tomorrow?"
+	CronRun       = "cron_20261122_075900_01" // a cron run with messages and no title
+	CronEmpty     = "cron_20261122_075800_02" // a cron run that stored nothing
+	SubagentChild = "20261122_075700_8a8b8c"  // a delegated child of the main chat
+	BatchRun      = "batch_20261122_075600_03"
+	PinnedCron    = "cron_20261121_060000_04" // a cron run pinned by hand
+	PinnedTitle   = "Morning brief job"
+	FutureSource  = "20261122_075500_9a9b9c" // a source this app does not know: a conversation
+)
+
+// AddBackgroundRuns adds sessions no one chatted in, newer than every chat
+// of the design seed, beside two conversations the sidebar must keep.
+func AddBackgroundRuns(d *Data, now time.Time) {
+	ago := func(dur time.Duration) float64 { return float64(now.Add(-dur).Unix()) }
+	add := func(id, source, title, preview string, msgs int, last time.Duration, extra map[string]any) {
+		row := map[string]any{"id": id, "title": title, "profile": "default", "source": source, "model": "anthropic/claude-sonnet-4.6",
+			"started_at": ago(last + time.Minute), "last_active": ago(last), "message_count": msgs, "tool_call_count": 0,
+			"pinned": false, "archived": false, "unread": false, "is_active": false, "preview": preview}
+		for k, v := range extra {
+			row[k] = v
+		}
+		d.Sessions = append(d.Sessions, row)
+	}
+	add(UntitledChat, "gui", "", UntitledText, 2, 10*time.Second, nil)
+	add(CronRun, "cron", "", "Run the morning brief and post it to Telegram", 3, 5*time.Second, nil)
+	add(CronEmpty, "cron", "", "", 0, 4*time.Second, nil)
+	add(SubagentChild, "subagent", "Find fieldwork pages", "Search Notion for fieldwork pages", 5, 3*time.Second,
+		map[string]any{"parent_session_id": "20261122_080205_fb120f"})
+	add(BatchRun, "batch", "", "Evaluate prompt 17", 2, 2*time.Second, nil)
+	// Old enough to sit far below the first page of cron runs.
+	add(PinnedCron, "cron", PinnedTitle, "Run the morning brief", 4, 30*time.Hour, map[string]any{"pinned": true})
+	add(FutureSource, "hologram", "Plan the weekend surf trip", "", 2, 20*time.Second, nil)
+}

@@ -225,35 +225,58 @@ func (c *Client) Profiles(ctx context.Context) ([]Profile, error) {
 	return v.Profiles, err
 }
 
-// SessionQuery filters a session listing.
+// SessionQuery filters a session listing. By default it leaves out the
+// background runs (BackgroundSources), as Hermes's own desktop does for its
+// recents: always-newest cron runs would otherwise fill every page.
 type SessionQuery struct {
-	Profile string // "" = the default profile; "all" = every agent (AllSessions)
+	Profile string // "" = the default profile; "all" = every agent (AllSessionsQuery)
 	Limit   int
 	Offset  int
+	// Background lists the background runs too.
+	Background bool
+	// Sources, if set, lists only sessions from these sources.
+	Sources []string
 }
 
-// Sessions lists one agent's sessions, most recent first.
-func (c *Client) Sessions(ctx context.Context, sq SessionQuery) (SessionPage, error) {
+func (sq SessionQuery) values(maxLimit int) url.Values {
 	q := url.Values{
-		"limit": {strconv.Itoa(max(1, min(sq.Limit, 100)))}, "offset": {strconv.Itoa(sq.Offset)},
-		"min_messages": {"1"}, "archived": {"exclude"}, "order": {"recent"}, "full": {"false"},
+		"limit": {strconv.Itoa(max(1, min(sq.Limit, maxLimit)))}, "offset": {strconv.Itoa(sq.Offset)},
+		"min_messages": {"1"}, "archived": {"exclude"}, "order": {"recent"},
 	}
 	if sq.Profile != "" {
 		q.Set("profile", sq.Profile)
 	}
+	switch {
+	case len(sq.Sources) > 0:
+		q.Set("sources", strings.Join(sq.Sources, ","))
+	case !sq.Background:
+		q.Set("exclude_sources", strings.Join(BackgroundSources, ","))
+	}
+	return q
+}
+
+// Sessions lists one agent's sessions, most recent first.
+func (c *Client) Sessions(ctx context.Context, sq SessionQuery) (SessionPage, error) {
+	q := sq.values(100)
+	q.Set("full", "false")
 	var p SessionPage
 	err := c.do(ctx, http.MethodGet, "/api/sessions", q, nil, &p)
 	return p, err
 }
 
-// AllSessions lists sessions across every agent (GET /api/profiles/sessions).
+// AllSessions lists the conversations of every agent, without background
+// runs (GET /api/profiles/sessions).
 func (c *Client) AllSessions(ctx context.Context, limit, offset int) (SessionPage, error) {
-	q := url.Values{
-		"limit": {strconv.Itoa(max(1, min(limit, 500)))}, "offset": {strconv.Itoa(offset)},
-		"order": {"recent"}, "profile": {"all"}, "min_messages": {"1"}, "archived": {"exclude"},
+	return c.AllSessionsQuery(ctx, SessionQuery{Limit: limit, Offset: offset})
+}
+
+// AllSessionsQuery lists sessions across agents; Profile "" means every agent.
+func (c *Client) AllSessionsQuery(ctx context.Context, sq SessionQuery) (SessionPage, error) {
+	if sq.Profile == "" {
+		sq.Profile = "all"
 	}
 	var p SessionPage
-	err := c.do(ctx, http.MethodGet, "/api/profiles/sessions", q, nil, &p)
+	err := c.do(ctx, http.MethodGet, "/api/profiles/sessions", sq.values(500), nil, &p)
 	return p, err
 }
 
@@ -278,11 +301,15 @@ func (c *Client) Messages(ctx context.Context, profile, id string, limit int) ([
 	return p.Messages, err
 }
 
-// Search finds sessions by ID or full text.
-func (c *Client) Search(ctx context.Context, profile, query string, limit int) ([]SearchResult, error) {
+// Search finds sessions by ID or full text, without background runs
+// unless background is true.
+func (c *Client) Search(ctx context.Context, profile, query string, limit int, background bool) ([]SearchResult, error) {
 	q := profileQuery(profile)
 	q.Set("q", query)
 	q.Set("limit", strconv.Itoa(max(1, min(limit, 100))))
+	if !background {
+		q.Set("exclude_sources", strings.Join(BackgroundSources, ","))
+	}
 	var v struct {
 		Results []SearchResult `json:"results"`
 	}

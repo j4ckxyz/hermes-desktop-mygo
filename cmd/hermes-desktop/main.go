@@ -257,6 +257,7 @@ func main() {
 			open, hasOpen = app.Instances.List[0], true
 		}
 		u = views.New(app, s, native)
+		app.SetShowBackground(s.ShowBackgroundRuns) // before the cached sidebar is filtered
 		if hasOpen {
 			u.Screen = views.ScreenMain
 			app.OpenWith(open, l.preload)

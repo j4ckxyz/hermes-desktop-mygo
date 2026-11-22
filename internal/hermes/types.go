@@ -7,6 +7,7 @@ package hermes
 import (
 	"encoding/json"
 	"math"
+	"slices"
 	"strings"
 	"time"
 )
@@ -105,6 +106,26 @@ type Session struct {
 	IsActive        bool    `json:"is_active"`
 	Profile         string  `json:"profile"`
 	ParentSessionID *string `json:"parent_session_id"`
+}
+
+// BackgroundSources are the sources of sessions that run without a person
+// in the chat: scheduled jobs, delegated children, batch runs and Kanban
+// workers (agent/session_source.py and batch_runner.py upstream). Every
+// other source, including an empty or unknown one, is a conversation.
+var BackgroundSources = []string{"cron", "subagent", "batch", "kanban"}
+
+// IsBackgroundSource reports whether source is one of BackgroundSources.
+func IsBackgroundSource(source string) bool {
+	return slices.Contains(BackgroundSources, strings.ToLower(strings.TrimSpace(source)))
+}
+
+// Background reports whether the session is a background run.
+func (s Session) Background() bool { return IsBackgroundSource(s.Source) }
+
+// Blank reports whether the session has nothing to show: no title, no
+// preview and no stored message.
+func (s Session) Blank() bool {
+	return s.MessageCount == 0 && strings.TrimSpace(s.Title) == "" && strings.TrimSpace(s.Preview) == ""
 }
 
 // DisplayTitle is the title, the preview, or "Untitled".
@@ -213,6 +234,7 @@ type SearchResult struct {
 	Snippet   string `json:"snippet"`
 	Role      string `json:"role"`
 	Profile   string `json:"profile"`
+	Source    string `json:"source"`
 	Preview   string `json:"preview"`
 	Last      Time   `json:"last_active"`
 }

@@ -374,13 +374,25 @@ func TestConnectExplainsMissingSessionToken(t *testing.T) {
 	}
 }
 
+// pages counts the session pages read, leaving out the request for pinned
+// background runs.
+func pages(srv *hermestest.Server) int {
+	n := 0
+	for _, q := range srv.Queries("GET /api/profiles/sessions") {
+		if !q.Has("sources") {
+			n++
+		}
+	}
+	return n
+}
+
 func TestSyncPagesThenStopsEarly(t *testing.T) {
 	e := setup(t, hermestest.Options{}, "")
 	e.app.Open(e.inst)
 	c := e.app.Conn
 	e.loop.until(t, "first sync", func() bool { return c.Synced })
 	// 245 sessions: a first page of 200, then the remaining 45.
-	if n := e.srv.CallCount("GET /api/profiles/sessions"); n != 2 {
+	if n := pages(e.srv); n != 2 {
 		t.Fatalf("first sync pages: %d", n)
 	}
 	if len(c.Sessions) != 245 || c.Totals["default"] != 239 {
@@ -391,7 +403,7 @@ func TestSyncPagesThenStopsEarly(t *testing.T) {
 	c.Synced = false
 	c.Refresh()
 	e.loop.until(t, "second sync", func() bool { return c.Synced })
-	if n := e.srv.CallCount("GET /api/profiles/sessions"); n != 3 {
+	if n := pages(e.srv); n != 3 {
 		t.Fatalf("incremental sync should read one page, read %d", n-2)
 	}
 }
@@ -683,5 +695,170 @@ func TestANewChatStaysListedBeforeItsFirstMessageIsStored(t *testing.T) {
 	e.loop.until(t, "synced", func() bool { return !c.syncing.Load() && e.srv.CallCount("GET /api/profiles") >= 2 })
 	if _, ok := c.Session(created); !ok {
 		t.Fatal("the new chat left the sidebar")
+	}
+}
+
+func backgroundSeed() *hermestest.Data {
+	seed := hermestest.DesignSeed(time.Now())
+	hermestest.AddBackgroundRuns(&seed, time.Now())
+	return &seed
+}
+
+// listed reports which of ids the sidebar holds.
+func listed(c *Connection, ids ...string) map[string]bool {
+	out := map[string]bool{}
+	for _, id := range ids {
+		_, out[id] = c.Session(id)
+	}
+	return out
+}
+
+func TestBackgroundRunsStayOutOfRecents(t *testing.T) {
+	e := setup(t, hermestest.Options{Canonical: true, Seed: backgroundSeed()}, "")
+	e.app.Open(e.inst)
+	c := e.app.Conn
+	e.loop.until(t, "sync", func() bool { return c.Synced })
+
+	// Both listings ask the instance to leave background runs out.
+	for _, k := range []string{"GET /api/profiles/sessions", "GET /api/sessions"} {
+		qs := e.srv.Queries(k)
+		if len(qs) == 0 {
+			t.Fatalf("no %s", k)
+		}
+		q := qs[0]
+		if q.Get("exclude_sources") != "cron,subagent,batch,kanban" || q.Get("min_messages") != "1" ||
+			q.Get("archived") != "exclude" || q.Get("order") != "recent" {
+			t.Errorf("%s query: %v", k, q)
+		}
+	}
+	got := listed(c, hermestest.UntitledChat, hermestest.FutureSource, hermestest.PinnedCron,
+		hermestest.CronRun, hermestest.CronEmpty, hermestest.SubagentChild, hermestest.BatchRun)
+	for id, want := range map[string]bool{
+		hermestest.UntitledChat: true, hermestest.FutureSource: true, hermestest.PinnedCron: true,
+		hermestest.CronRun: false, hermestest.CronEmpty: false, hermestest.SubagentChild: false, hermestest.BatchRun: false,
+	} {
+		if got[id] != want {
+			t.Errorf("%s listed %v, want %v", id, got[id], want)
+		}
+	}
+	if s, _ := c.Session(hermestest.UntitledChat); c.Title(s) != hermestest.UntitledText {
+		t.Errorf("an untitled chat is listed by its preview, not %q", c.Title(s))
+	}
+	if s, _ := c.Session(hermestest.PinnedCron); c.Title(s) != hermestest.PinnedTitle {
+		t.Errorf("pinned cron run title %q", c.Title(s))
+	}
+	for _, s := range c.Sessions {
+		if s.Blank() {
+			t.Errorf("a session with nothing to show is listed: %s", s.ID)
+		}
+	}
+	// "N more" counts conversations only: the design's 239 and the two added.
+	if c.Totals["default"] != 241 {
+		t.Errorf("default total %d, want 241", c.Totals["default"])
+	}
+
+	// Shown on purpose, they come back with every page, and nothing else changes.
+	c.Synced = false
+	e.app.SetShowBackground(true)
+	e.loop.until(t, "sync with background runs", func() bool { return c.Synced })
+	got = listed(c, hermestest.CronRun, hermestest.SubagentChild, hermestest.BatchRun, hermestest.PinnedCron, hermestest.CronEmpty, hermestest.UntitledChat)
+	for id, want := range map[string]bool{
+		hermestest.CronRun: true, hermestest.SubagentChild: true, hermestest.BatchRun: true, hermestest.PinnedCron: true,
+		hermestest.UntitledChat: true, hermestest.CronEmpty: false,
+	} {
+		if got[id] != want {
+			t.Errorf("shown: %s listed %v, want %v", id, got[id], want)
+		}
+	}
+	if q := e.srv.Queries("GET /api/profiles/sessions"); q[len(q)-1].Has("exclude_sources") {
+		t.Errorf("shown: the listing still excludes sources: %v", q[len(q)-1])
+	}
+	if c.Totals["default"] != 245 {
+		t.Errorf("shown: default total %d, want 245", c.Totals["default"])
+	}
+
+	// Open one, then hide them again: the open run stays, the rest go at once.
+	c.OpenChat(hermestest.CronRun)
+	e.app.SetShowBackground(false)
+	got = listed(c, hermestest.CronRun, hermestest.BatchRun, hermestest.SubagentChild, hermestest.PinnedCron)
+	if !got[hermestest.CronRun] || got[hermestest.BatchRun] || got[hermestest.SubagentChild] || !got[hermestest.PinnedCron] {
+		t.Errorf("hidden again: %v", got)
+	}
+	// Nothing was changed on the instance.
+	if e.srv.CallCount("PATCH /api/sessions/{id}") != 0 || e.srv.CallCount("DELETE /api/sessions/{id}") != 0 {
+		t.Error("hiding background runs wrote to the instance")
+	}
+}
+
+func TestCachedBackgroundRunsAreHidden(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "cache.db")
+	e := setup(t, hermestest.Options{Latency: 2 * time.Second}, path)
+	now := time.Now()
+	at := func(d time.Duration) hermes.Time { return hermes.Time{Time: now.Add(-d)} }
+	// What an older build cached: every source, as the listing then sent them.
+	old := []hermes.Session{
+		{ID: "chat", Title: "Plan the week", Source: "gui", Profile: "default", MessageCount: 4, LastActive: at(time.Hour)},
+		{ID: "untitled", Preview: "Hello there", Source: "cli", Profile: "default", MessageCount: 2, LastActive: at(time.Hour)},
+		{ID: "nosource", Title: "From an old instance", Profile: "default", MessageCount: 2, LastActive: at(time.Hour)},
+		{ID: "cron", Preview: "Run the morning brief", Source: "cron", Profile: "default", MessageCount: 3, LastActive: at(time.Minute)},
+		{ID: "sub", Title: "Child", Source: "subagent", Profile: "default", MessageCount: 3, LastActive: at(time.Minute)},
+		{ID: "pinned", Title: "Kept", Source: "cron", Profile: "default", MessageCount: 3, Pinned: true, LastActive: at(time.Minute)},
+		{ID: "blank", Source: "gui", Profile: "default", LastActive: at(time.Minute)},
+	}
+	if err := e.app.Cache.PutSessions(context.Background(), "i1", old, true); err != nil {
+		t.Fatal(err)
+	}
+	e.app.OpenWith(e.inst, ReadPreload(e.app.Cache, "i1"))
+	c := e.app.Conn
+	if c.Synced {
+		t.Fatal("the network should not have answered yet")
+	}
+	got := listed(c, "chat", "untitled", "nosource", "cron", "sub", "pinned", "blank")
+	for id, want := range map[string]bool{"chat": true, "untitled": true, "nosource": true, "pinned": true, "cron": false, "sub": false, "blank": false} {
+		if got[id] != want {
+			t.Errorf("cached %s listed %v, want %v", id, got[id], want)
+		}
+	}
+	// Shown on purpose, the cached runs come back from the cache's rows.
+	e.app.SetShowBackground(true)
+	c.setSessions(old)
+	if got := listed(c, "cron", "sub", "blank"); !got["cron"] || !got["sub"] || got["blank"] {
+		t.Errorf("shown: %v", got)
+	}
+}
+
+func TestSearchLeavesOutBackgroundRuns(t *testing.T) {
+	for _, ignores := range []bool{false, true} {
+		e := setup(t, hermestest.Options{Seed: backgroundSeed(), IgnoreSearchSources: ignores}, "")
+		e.app.Open(e.inst)
+		c := e.app.Conn
+		e.loop.until(t, "sync", func() bool { return c.Synced })
+		search := func() []string {
+			var ids []string
+			done := false
+			c.Search("fieldwork", func(res []hermes.SearchResult, err error) {
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, r := range res {
+					ids = append(ids, r.SessionID)
+				}
+				done = true
+			})
+			e.loop.until(t, "search", func() bool { return done })
+			return ids
+		}
+		ids := strings.Join(search(), ",")
+		if strings.Contains(ids, hermestest.SubagentChild) || !strings.Contains(ids, "20261122_070000_d4e5f6") {
+			t.Errorf("ignores sources %v: search found %s", ignores, ids)
+		}
+		if q := e.srv.Queries("GET /api/sessions/search"); q[0].Get("exclude_sources") != "cron,subagent,batch,kanban" {
+			t.Errorf("search query %v", q[0])
+		}
+		e.app.SetShowBackground(true)
+		if ids := strings.Join(search(), ","); !strings.Contains(ids, hermestest.SubagentChild) {
+			t.Errorf("ignores sources %v: shown, search found %s", ignores, ids)
+		}
+		c.Close()
 	}
 }
