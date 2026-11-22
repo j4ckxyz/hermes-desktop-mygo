@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Linux libraries (GTK 3, Pango, cairo, libepoxy; Xvfb for the smoke test)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-0 libpango-1.0-0 libcairo2 libepoxy0 fonts-dejavu-core xvfb imagemagick
+      - name: Vet
+        run: |
+          go vet ./...
+          go vet -tags demo ./...
+      - name: Test
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then go test -race ./...; else go test ./...; fi
+      - name: Build
+        run: go build -tags demo -o bin/ ./cmd/hermes-desktop
+      - name: Launch smoke test (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          export HERMES_DESKTOP_HOME=$(mktemp -d)
+          HERMES_DESKTOP_BENCH=launch timeout 60 xvfb-run -a -s "-screen 0 1440x900x24" ./bin/hermes-desktop | tee launch.txt
+          grep -q '^first-frame ' launch.txt
+      - name: Launch smoke test (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          export HERMES_DESKTOP_HOME=$(mktemp -d)
+          HERMES_DESKTOP_BENCH=launch ./bin/hermes-desktop | tee launch.txt &
+          pid=$!; for i in $(seq 60); do grep -q '^first-frame ' launch.txt 2>/dev/null && break; sleep 1; done
+          kill $pid 2>/dev/null || true
+          grep -q '^first-frame ' launch.txt
+      - name: Launch smoke test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:HERMES_DESKTOP_HOME = New-Item -ItemType Directory -Path (Join-Path $env:RUNNER_TEMP "hd")
+          $env:HERMES_DESKTOP_BENCH = "launch"
+          $p = Start-Process -FilePath .\bin\hermes-desktop.exe -RedirectStandardOutput launch.txt -PassThru
+          if (-not $p.WaitForExit(60000)) { $p.Kill(); throw "no first frame within 60 s" }
+          Get-Content launch.txt
+          if (-not (Select-String -Path launch.txt -Pattern '^first-frame ')) { throw "no first frame" }
+
+  cross:
+    name: Cross-compile from Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make cross
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hermes-desktop-${{ github.sha }}
+          path: dist/
+          retention-days: 7
