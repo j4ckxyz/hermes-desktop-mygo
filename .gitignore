@@ -1,0 +1,26 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Build output
+/dist/
+/bin/
+*.exe
+*.app/
+*.test
+*.prof
+coverage.out
+
+# Local caches / screenshots
+/screenshots/local/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+.DS_Store
+
+# Live recordings (may hold your chats)
+/testdata-live/

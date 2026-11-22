@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hermes Desktop · Look &amp; Feel</title>
+<script src="./_runtime/react.js"></script>
+<script src="./_runtime/react-dom.js"></script>
+<script src="./_runtime/support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;family=Newsreader:opsz,wght@6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#EE8AB8}a:hover{color:#F6B5D2}
+button,select,input{font:inherit}
+button{cursor:pointer}
+@keyframes hgrid{0%,100%{opacity:.2}50%{opacity:1}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.breathe{animation:breathe 2.6s ease-in-out infinite}
+.spin{animation:spin 6s linear infinite}
+.ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+</style>
+</helmet>
+<div style="width: 100%; min-height: 900px; box-sizing: border-box; background: {{t.bg}}; color: {{t.text}}; font-family: {{fontStack}}; display: flex; flex-direction: column">
+
+  <div style="display: flex; align-items: center; height: 56px; padding: 0 22px; border-bottom: 1px solid {{t.line}}">
+    <div style="display: flex; gap: 8px" aria-hidden="true">
+      <span style="width: 12px; height: 12px; border-radius: 50%; background: #FF5F57"></span>
+      <span style="width: 12px; height: 12px; border-radius: 50%; background: #FEBC2E"></span>
+      <span style="width: 12px; height: 12px; border-radius: 50%; background: #28C840"></span>
+    </div>
+    <span style="flex: 1; text-align: center; font-size: 14px; font-weight: 700; color: {{t.muted}}">Settings</span>
+    <span style="width: 52px"></span>
+  </div>
+
+  <div style="flex: 1; display: flex; flex-wrap: wrap; align-items: flex-start">
+    <nav aria-label="Settings sections" style="flex: 1 0 230px; max-width: 260px; box-sizing: border-box; padding: 20px 14px; display: flex; flex-direction: column; gap: 4px">
+      <a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 10px; border-radius: 12px; color: {{t.muted}}; text-decoration: none; font-size: 14px; font-weight: 600"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg>Back to chats</a>
+      <button style="display: flex; align-items: center; gap: 12px; padding: 11px 12px; border: 0; border-radius: 12px; background: transparent; color: {{t.text}}; font-size: 15px; text-align: left"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>General</button>
+      <button style="display: flex; align-items: center; gap: 12px; padding: 11px 12px; border: 0; border-radius: 12px; background: transparent; color: {{t.text}}; font-size: 15px; text-align: left"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="2"></rect><rect x="3" y="13" width="18" height="7" rx="2"></rect><path d="M7 7.5h.01M7 16.5h.01"></path></svg>Instances</button>
+      <button style="display: flex; align-items: center; gap: 12px; padding: 11px 12px; border: 0; border-radius: 12px; background: transparent; color: {{t.text}}; font-size: 15px; text-align: left"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="4"></circle><circle cx="17" cy="15" r="3"></circle><path d="M2 21a7 7 0 0 1 11-5.7"></path></svg>Agents &amp; profiles</button>
+      <button aria-current="page" style="display: flex; align-items: center; gap: 12px; padding: 11px 12px; border: 0; border-radius: 12px; background: {{t.surf}}; color: {{t.text}}; font-size: 15px; font-weight: 700; text-align: left"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{t.accentText}}" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 3v18"></path><path d="M12 3a9 9 0 0 1 0 18" fill="{{t.accentText}}"></path></svg>Look &amp; Feel</button>
+      <button style="display: flex; align-items: center; gap: 12px; padding: 11px 12px; border: 0; border-radius: 12px; background: transparent; color: {{t.text}}; font-size: 15px; text-align: left"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4"></path></svg>Notifications</button>
+      <button style="display: flex; align-items: center; gap: 12px; padding: 11px 12px; border: 0; border-radius: 12px; background: transparent; color: {{t.text}}; font-size: 15px; text-align: left"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"></path></svg>Permissions</button>
+      <button style="display: flex; align-items: center; gap: 12px; padding: 11px 12px; border: 0; border-radius: 12px; background: transparent; color: {{t.text}}; font-size: 15px; text-align: left"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="m7 9 3 3-3 3M12 15h5"></path></svg>Terminal &amp; SSH</button>
+      <button style="display: flex; align-items: center; gap: 12px; padding: 11px 12px; border: 0; border-radius: 12px; background: transparent; color: {{t.text}}; font-size: 15px; text-align: left"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"></path></svg>Updates</button>
+    </nav>
+
+    <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 28px 32px 48px">
+      <div style="max-width: 1040px; display: flex; flex-direction: column; gap: 22px">
+        <h1 style="margin: 0; font-size: 30px; font-weight: 800">Look &amp; Feel</h1>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 20px">
+
+          <!-- Appearance -->
+          <section style="padding: 24px; border-radius: 28px; background: {{t.surf}}; border: 1px solid {{t.line}}; display: flex; flex-direction: column; gap: 18px">
+            <h2 style="margin: 0; font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 10px"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"></circle><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"></path></svg>Appearance</h2>
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+              <sc-for list="{{appearanceOpts}}" as="o" hint-placeholder-count="3">
+                <button onClick="{{o.pick}}" aria-pressed="{{o.sel}}" style="border: 0; background: transparent; padding: 0; display: flex; flex-direction: column; gap: 10px; color: {{t.text}}">
+                  <span style="{{o.tile}}">Aa</span>
+                  <span style="font-size: 14px; color: {{o.labelColor}}">{{o.label}}</span>
+                </button>
+              </sc-for>
+            </div>
+            <p style="margin: 0; font-size: 13px; color: {{t.muted}}">Follow the system setting or stay in light or dark mode.</p>
+          </section>
+
+          <!-- Preview -->
+          <section aria-label="Preview" style="padding: 24px; border-radius: 28px; background: {{t.bg}}; border: 1px solid {{t.line2}}; display: flex; flex-direction: column; gap: 12px">
+            <span style="font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: {{t.muted}}">PREVIEW</span>
+            <div style="display: flex; align-items: center; gap: 10px">
+              <span class="breathe" style="width: 30px; height: 30px; border-radius: 50%; flex: none; background: radial-gradient(circle at 32% 28%, #F8DCE4 0%, #B9566F 40%, #3B0E1E 80%)"></span>
+              <span style="font-size: {{titleSize}}px; font-weight: 700">Hermes</span>
+            </div>
+            <div style="margin-left: 14px; border-left: 1.5px solid {{t.line2}}; padding-left: 12px; display: flex; align-items: center; gap: 8px">
+              <span class="ell" style="flex: 1; font-size: {{bodySize}}px">Shorten morning news and surf links</span>
+              <sc-if value="{{loaderIsGrid}}" hint-placeholder-val="{{ true }}">
+                <span style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.5px"><sc-for list="{{previewCells}}" as="c" hint-placeholder-count="16"><span style="{{c.style}}"></span></sc-for></span>
+              </sc-if>
+              <sc-if value="{{loaderIsOrb}}" hint-placeholder-val="{{ false }}">
+                <span class="breathe" style="{{previewOrb}}"></span>
+              </sc-if>
+              <span style="font-size: 12px; color: {{t.accentText}}">Working</span>
+            </div>
+            <div style="align-self: flex-end; max-width: 80%; padding: 10px 14px; border-radius: 18px; background: {{t.surf2}}; font-size: {{bodySize}}px">Keep the surf report to one line.</div>
+            <div style="display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 14px; background: {{t.pill}}; border: 1px solid {{t.pillLine}}">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{t.ok}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="m7 9 3 3-3 3M12 15h5"></path></svg>
+              <span style="font-size: 13px; font-weight: 700">Ran command</span>
+              <span class="ell" style="font-size: 12px; color: {{t.muted}}; font-family: 'JetBrains Mono', ui-monospace, monospace">hermes sessions list</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 22px; background: {{t.surf}}; border: 1px solid {{t.line}}">
+              <span style="flex: 1; padding-left: 10px; font-size: 13px; color: {{t.muted}}">Message Hermes</span>
+              <span style="width: 32px; height: 32px; border-radius: 50%; background: {{t.accent}}; display: flex; align-items: center; justify-content: center; color: {{t.onAccent}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 10v4M10 7v10M14 9v6M18 11v2"></path></svg></span>
+            </div>
+          </section>
+
+          <!-- Light canvas -->
+          <section style="padding: 24px; border-radius: 28px; background: {{t.surf}}; border: 1px solid {{t.line}}; display: flex; flex-direction: column; gap: 18px">
+            <h2 style="margin: 0; font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 10px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>Light Canvas</h2>
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+              <sc-for list="{{lightOpts}}" as="o" hint-placeholder-count="2">
+                <button onClick="{{o.pick}}" aria-pressed="{{o.sel}}" style="border: 0; background: transparent; padding: 0; display: flex; flex-direction: column; gap: 10px; color: {{t.text}}">
+                  <span style="{{o.tile}}">Aa</span>
+                  <span style="font-size: 14px; color: {{o.labelColor}}">{{o.label}}</span>
+                </button>
+              </sc-for>
+            </div>
+            <p style="margin: 0; font-size: 13px; color: {{t.muted}}">The paper the app is printed on while it is in light mode.</p>
+          </section>
+
+          <!-- Dark canvas -->
+          <section style="padding: 24px; border-radius: 28px; background: {{t.surf}}; border: 1px solid {{t.line}}; display: flex; flex-direction: column; gap: 18px">
+            <h2 style="margin: 0; font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 10px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"></path></svg>Dark Canvas</h2>
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+              <sc-for list="{{darkOpts}}" as="o" hint-placeholder-count="3">
+                <button onClick="{{o.pick}}" aria-pressed="{{o.sel}}" style="border: 0; background: transparent; padding: 0; display: flex; flex-direction: column; gap: 10px; color: {{t.text}}">
+                  <span style="{{o.tile}}">Aa</span>
+                  <span style="font-size: 14px; color: {{o.labelColor}}">{{o.label}}</span>
+                </button>
+              </sc-for>
+            </div>
+            <p style="margin: 0; font-size: 13px; color: {{t.muted}}">The same, for dark mode.</p>
+          </section>
+
+          <!-- Accent -->
+          <section style="padding: 24px; border-radius: 28px; background: {{t.surf}}; border: 1px solid {{t.line}}; display: flex; flex-direction: column; gap: 18px">
+            <h2 style="margin: 0; font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 10px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.9 1.4-2l-.4-1a1.7 1.7 0 0 1 1.6-2.3H17a4 4 0 0 0 4-4c0-4.7-4-8.7-9-8.7z"></path><circle cx="7.5" cy="11" r="1"></circle><circle cx="10" cy="7" r="1"></circle><circle cx="15" cy="7.5" r="1"></circle></svg>Accent Colour</h2>
+            <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; justify-items: center">
+              <sc-for list="{{accents}}" as="a" hint-placeholder-count="10">
+                <button onClick="{{a.pick}}" aria-pressed="{{a.sel}}" aria-label="{{a.label}}" style="{{a.style}}">
+                  <sc-if value="{{a.sel}}" hint-placeholder-val="{{ false }}">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>
+                  </sc-if>
+                </button>
+              </sc-for>
+            </div>
+            <p style="margin: 0; font-size: 13px; color: {{t.muted}}">Used for links, loaders, the voice button and other emphasised controls.</p>
+          </section>
+
+          <!-- Font and text size -->
+          <section style="padding: 24px; border-radius: 28px; background: {{t.surf}}; border: 1px solid {{t.line}}; display: flex; flex-direction: column; gap: 16px">
+            <h2 style="margin: 0; font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 10px"><span aria-hidden="true" style="font-size: 15px; font-weight: 800">Aa</span>Font &amp; Text Size</h2>
+            <label for="font" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Font</label>
+            <select id="font" onChange="{{pickFont}}" value="{{font}}" style="height: 48px; padding: 0 14px; border-radius: 14px; border: 1px solid {{t.line}}; background: {{t.surf2}}; color: {{t.text}}; font-size: 15px">
+              <option value="Rounded">SF Rounded · Default</option>
+              <option value="System">System</option>
+              <option value="Serif">Serif</option>
+              <option value="Mono">Mono</option>
+            </select>
+            <p style="margin: 0; font-size: {{titleSize}}px">A clear view of your conversations.</p>
+            <div style="display: flex; flex-direction: column; gap: 8px; padding-top: 4px">
+              <span style="font-size: 15px; font-weight: 700">{{sizeLabel}}</span>
+              <div style="display: flex; align-items: center; gap: 12px">
+                <span aria-hidden="true" style="font-size: 13px">A</span>
+                <label for="size" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Text size</label>
+                <input id="size" type="range" min="0" max="6" step="1" value="{{size}}" onChange="{{pickSize}}" style="flex: 1; accent-color: {{t.accent}}">
+                <span aria-hidden="true" style="font-size: 22px">A</span>
+              </div>
+              <p style="margin: 0; font-size: 13px; color: {{t.muted}}">The first step follows your system text size.</p>
+            </div>
+          </section>
+
+          <!-- Loading indicator -->
+          <section style="grid-column: 1 / -1; padding: 24px; border-radius: 28px; background: {{t.surf}}; border: 1px solid {{t.line}}; display: flex; flex-direction: column; gap: 18px">
+            <h2 style="margin: 0; font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 10px"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="3" y="3" width="5" height="5" rx="1"></rect><rect x="10" y="3" width="5" height="5" rx="1"></rect><rect x="17" y="3" width="4" height="5" rx="1"></rect><rect x="3" y="10" width="5" height="5" rx="1"></rect><rect x="10" y="10" width="5" height="5" rx="1"></rect><rect x="17" y="10" width="4" height="5" rx="1"></rect><rect x="3" y="17" width="5" height="4" rx="1"></rect><rect x="10" y="17" width="5" height="4" rx="1"></rect><rect x="17" y="17" width="4" height="4" rx="1"></rect></svg>Loading Indicator</h2>
+            <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px">
+              <sc-for list="{{grids}}" as="l" hint-placeholder-count="5">
+                <button onClick="{{l.pick}}" aria-pressed="{{l.sel}}" aria-label="{{l.label}}" style="{{l.tile}}">
+                  <span style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px"><sc-for list="{{l.cells}}" as="c" hint-placeholder-count="16"><span style="{{c.style}}"></span></sc-for></span>
+                </button>
+              </sc-for>
+              <sc-for list="{{lights}}" as="l" hint-placeholder-count="5">
+                <button onClick="{{l.pick}}" aria-pressed="{{l.sel}}" aria-label="{{l.label}}" style="{{l.tile}}"><span class="{{l.cls}}" style="{{l.vis}}"></span></button>
+              </sc-for>
+              <sc-for list="{{mists}}" as="l" hint-placeholder-count="5">
+                <button onClick="{{l.pick}}" aria-pressed="{{l.sel}}" aria-label="{{l.label}}" style="{{l.tile}}"><span class="{{l.cls}}" style="{{l.vis}}"></span></button>
+              </sc-for>
+            </div>
+            <p style="margin: 0; font-size: 13px; color: {{t.muted}}">Shown while agents and tools are working: a marching grid, a sphere of light, or a sphere of mist.</p>
+          </section>
+
+          <!-- Characters -->
+          <section style="padding: 24px; border-radius: 28px; background: {{t.surf}}; border: 1px solid {{t.line}}; display: flex; flex-direction: column; gap: 14px">
+            <h2 style="margin: 0; font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 10px"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-3.5 7a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm7 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM7.5 15h9a4.5 4.5 0 0 1-9 0z"></path></svg>Characters</h2>
+            <div style="display: flex; align-items: center; gap: 16px">
+              <span style="flex: 1; font-size: 16px">Animate agent characters</span>
+              <button role="switch" aria-checked="{{chars}}" aria-label="Animate agent characters" onClick="{{toggleChars}}" style="{{charsTrack}}"><span style="{{charsKnob}}"></span></button>
+            </div>
+            <p style="margin: 0; font-size: 13px; color: {{t.muted}}">Agent orbs breathe while idle and move about while an agent is working. Turn this off to keep them still.</p>
+          </section>
+
+          <!-- Sounds -->
+          <section style="padding: 24px; border-radius: 28px; background: {{t.surf}}; border: 1px solid {{t.line}}; display: flex; flex-direction: column; gap: 14px">
+            <h2 style="margin: 0; font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 10px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 12h2l2-6 4 14 3-10 2 4h5"></path></svg>Interaction</h2>
+            <div style="display: flex; align-items: center; gap: 16px">
+              <span style="flex: 1; font-size: 16px">Sounds</span>
+              <button role="switch" aria-checked="{{sounds}}" aria-label="Sounds" onClick="{{toggleSounds}}" style="{{soundsTrack}}"><span style="{{soundsKnob}}"></span></button>
+            </div>
+            <p style="margin: 0; font-size: 13px; color: {{t.muted}}">Plays a soft chime when an agent finishes or needs your approval.</p>
+          </section>
+
+          <!-- Background artwork -->
+          <section style="padding: 24px; border-radius: 28px; background: {{t.surf}}; border: 1px solid {{t.line}}; display: flex; flex-direction: column; gap: 14px">
+            <h2 style="margin: 0; font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 10px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="m3 17 5-5 4 4 3-3 6 6"></path><circle cx="16" cy="9" r="1.5"></circle></svg>Background Artwork</h2>
+            <div style="display: flex; align-items: center; gap: 16px">
+              <span style="flex: 1; font-size: 16px">Show background artwork</span>
+              <button role="switch" aria-checked="{{art}}" aria-label="Show background artwork" onClick="{{toggleArt}}" style="{{artTrack}}"><span style="{{artKnob}}"></span></button>
+            </div>
+            <p style="margin: 0; font-size: 13px; color: {{t.muted}}">A faint illustration behind the session list.</p>
+          </section>
+
+          <!-- Window -->
+          <section style="padding: 24px; border-radius: 28px; background: {{t.surf}}; border: 1px solid {{t.line}}; display: flex; flex-direction: column; gap: 14px">
+            <h2 style="margin: 0; font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 10px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="M9 4v16"></path></svg>Window</h2>
+            <div style="display: flex; align-items: center; gap: 16px">
+              <span style="flex: 1; font-size: 16px">Translucent sidebar</span>
+              <button role="switch" aria-checked="{{glass}}" aria-label="Translucent sidebar" onClick="{{toggleGlass}}" style="{{glassTrack}}"><span style="{{glassKnob}}"></span></button>
+            </div>
+            <p style="margin: 0; font-size: 13px; color: {{t.muted}}">Lets the desktop show through the sidebar on macOS and Windows 11.</p>
+          </section>
+
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1800}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { appearance: 'Automatic', light: 'White', dark: 'Midnight', accent: 8, loader: 'g3', font: 'Rounded', size: 0, chars: true, sounds: true, art: true, glass: false };
+  }
+  renderVals() {
+    const s = this.state;
+    const C = {
+      'Midnight': { dark: true, bg: '#030320', surf: '#1C1A36', surf2: '#272545', line: 'rgba(255,255,255,0.08)', line2: 'rgba(255,255,255,0.16)', text: '#F4F3FA', muted: '#A2A0BE', pill: '#132036', pillLine: 'rgba(70,211,138,0.22)', ok: '#46D38A' },
+      'Black': { dark: true, bg: '#000000', surf: '#1A1A1C', surf2: '#252528', line: 'rgba(255,255,255,0.09)', line2: 'rgba(255,255,255,0.17)', text: '#F5F5F7', muted: '#A3A3AA', pill: '#0F1B17', pillLine: 'rgba(70,211,138,0.22)', ok: '#46D38A' },
+      'Gray': { dark: true, bg: '#1C1C1E', surf: '#2A2A2D', surf2: '#353539', line: 'rgba(255,255,255,0.09)', line2: 'rgba(255,255,255,0.18)', text: '#F5F5F7', muted: '#AEAEB5', pill: '#1F2A26', pillLine: 'rgba(70,211,138,0.24)', ok: '#4FD892' },
+      'White': { dark: false, bg: '#FFFFFF', surf: '#F3F2F7', surf2: '#E9E8EF', line: 'rgba(0,0,0,0.08)', line2: 'rgba(0,0,0,0.15)', text: '#15141F', muted: '#5E5C70', pill: '#EEF6F1', pillLine: 'rgba(23,120,74,0.22)', ok: '#17784A' },
+      'Paper White': { dark: false, bg: '#FAF6EE', surf: '#F1EBDF', surf2: '#E7E0D1', line: 'rgba(60,40,10,0.09)', line2: 'rgba(60,40,10,0.17)', text: '#1F1B14', muted: '#655D50', pill: '#ECF1E6', pillLine: 'rgba(23,120,74,0.22)', ok: '#17784A' }
+    };
+    const ACC = [
+      ['Blue', '#5B7BF5'], ['Sky', '#3B82F6'], ['Indigo', '#7C7FE8'], ['Teal', '#5EC8C6'], ['Green', '#7ED58B'],
+      ['Yellow', '#E8CF60'], ['Orange', '#EFA35A'], ['Coral', '#EE736E'], ['Pink', '#EE8AB8'], ['Rainbow', '#B98AF0']
+    ];
+    const canvasName = s.appearance === 'Light' ? s.light : s.dark;
+    const t0 = C[canvasName];
+    const accent = ACC[s.accent][1];
+    const h = accent.replace('#', '');
+    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    const shade = (k) => '#' + [r, g, b].map((v) => Math.round(v * k).toString(16).padStart(2, '0')).join('');
+    const tint = (k) => '#' + [r, g, b].map((v) => Math.round(v + (255 - v) * k).toString(16).padStart(2, '0')).join('');
+    const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    const t = Object.assign({}, t0, {
+      accent: accent,
+      accentText: t0.dark ? accent : shade(0.55),
+      onAccent: lum > 0.55 ? '#14131F' : '#FFFFFF'
+    });
+    const ring = (sel) => sel ? '0 0 0 2.5px ' + accent : 'none';
+    const tile = (bg, sel, fg) => 'display: flex; align-items: center; justify-content: center; height: 84px; border-radius: 18px; font-size: 26px; font-weight: 800; color: ' + (fg || accent) + '; background: ' + bg + '; border: 1px solid ' + t.line + '; box-shadow: ' + ring(sel);
+    const lbl = (sel) => sel ? t.text : t.muted;
+
+    const appearanceOpts = [
+      ['Automatic', 'linear-gradient(135deg, #030320 0 50%, #FFFFFF 50% 100%)'],
+      ['Light', '#FFFFFF'],
+      ['Dark', '#030320']
+    ].map(([label, bg]) => ({ label, sel: s.appearance === label, tile: tile(bg, s.appearance === label), labelColor: lbl(s.appearance === label), pick: () => this.setState({ appearance: label }) }));
+    const lightOpts = [['White', '#FFFFFF'], ['Paper White', '#FAF6EE']].map(([label, bg]) => ({ label, sel: s.light === label, tile: tile(bg, s.light === label, shade(0.6)), labelColor: lbl(s.light === label), pick: () => this.setState({ light: label, appearance: s.appearance === 'Dark' ? 'Light' : s.appearance }) }));
+    const darkOpts = [['Midnight', '#030320'], ['Black', '#000000'], ['Gray', '#1C1C1E']].map(([label, bg]) => ({ label, sel: s.dark === label, tile: tile(bg, s.dark === label), labelColor: lbl(s.dark === label), pick: () => this.setState({ dark: label, appearance: s.appearance === 'Light' ? 'Dark' : s.appearance }) }));
+
+    const accents = ACC.map(([label, hex], i) => {
+      const sel = s.accent === i;
+      const bg = label === 'Rainbow' ? 'conic-gradient(#5B7BF5, #5EC8C6, #7ED58B, #E8CF60, #EFA35A, #EE736E, #EE8AB8, #7C7FE8, #5B7BF5)' : hex;
+      return { label: label + ' accent', sel, pick: () => this.setState({ accent: i }),
+        style: 'width: 52px; height: 52px; border-radius: 50%; border: ' + (sel ? '3px solid #FFFFFF' : '0') + '; background: ' + bg + '; box-shadow: ' + (sel ? '0 0 0 3px ' + hex + ', 0 0 18px ' + hex : 'none') + '; display: flex; align-items: center; justify-content: center; padding: 0' };
+    });
+
+    const loaderTile = (sel) => 'height: 72px; border-radius: 18px; border: 1px solid ' + t.line + '; background: ' + t.surf2 + '; display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: ' + (sel ? '0 0 0 2.5px ' + accent + ', 0 0 16px ' + accent : 'none');
+    const PATTERNS = [
+      (c, r) => c >= 2,
+      (c, r) => c + r >= 4,
+      (c, r) => r === 3,
+      (c, r) => !(c === 0 && r < 2),
+      (c, r) => (c + r) % 2 === 0
+    ];
+    const gridCells = (fn, animate, size) => Array.from({ length: 16 }, (_, i) => {
+      const c = i % 4, row = Math.floor(i / 4);
+      const base = 'display:block;width:' + size + 'px;height:' + size + 'px;border-radius:2px;background:' + accent + ';';
+      if (animate) return { style: base + 'animation:hgrid 1.2s ease-in-out ' + ((c + row) * 0.12).toFixed(2) + 's infinite' };
+      return { style: base + 'opacity:' + (fn(c, row) ? 1 : 0.22) };
+    });
+    const grids = PATTERNS.map((fn, i) => {
+      const id = 'g' + (i + 1), sel = s.loader === id;
+      return { label: 'Marching grid ' + (i + 1), sel, tile: loaderTile(sel), cells: gridCells(fn, sel, 6), pick: () => this.setState({ loader: id }) };
+    });
+    const soft = tint(0.55);
+    const LIGHTS = [
+      'radial-gradient(circle at 50% 50%, #FFFFFF 0%, ' + soft + ' 42%, transparent 70%)',
+      'repeating-linear-gradient(0deg, rgba(255,255,255,0.55) 0 3px, transparent 3px 7px), radial-gradient(circle, ' + soft + ' 0%, ' + accent + ' 50%, transparent 70%)',
+      'radial-gradient(circle at 30% 30%, #FFFFFF 0%, ' + soft + ' 30%, ' + accent + ' 55%, transparent 72%)',
+      'radial-gradient(circle, transparent 34%, #FFFFFF 44%, ' + soft + ' 56%, transparent 72%)',
+      'repeating-conic-gradient(rgba(255,255,255,0.7) 0deg 5deg, transparent 5deg 20deg), radial-gradient(circle, #FFFFFF 0%, ' + soft + ' 45%, transparent 70%)'
+    ];
+    const lights = LIGHTS.map((bg, i) => {
+      const id = 'l' + (i + 1), sel = s.loader === id;
+      return { label: 'Sphere of light ' + (i + 1), sel, tile: loaderTile(sel), cls: sel ? 'breathe' : '',
+        vis: 'display:block;width:42px;height:42px;border-radius:50%;background:' + bg + ';filter:blur(0.6px);-webkit-mask-image:radial-gradient(circle,#000 58%,transparent 72%);mask-image:radial-gradient(circle,#000 58%,transparent 72%)',
+        pick: () => this.setState({ loader: id }) };
+    });
+    const MIST = [4, 6, 5, 4.5, 0];
+    const mists = MIST.map((sz, i) => {
+      const id = 'm' + (i + 1), sel = s.loader === id;
+      const vis = sz ? 'display:block;width:42px;height:42px;border-radius:50%;background-image:radial-gradient(' + accent + ' 1.1px, transparent 1.7px);background-size:' + sz + 'px ' + sz + 'px;transform:rotate(' + (i * 17) + 'deg);-webkit-mask-image:radial-gradient(circle,#000 48%,transparent 70%);mask-image:radial-gradient(circle,#000 48%,transparent 70%)'
+        : 'display:block;width:36px;height:22px;border-radius:50%;border:2px dotted ' + accent + ';transform:rotate(-24deg);box-shadow:0 0 0 7px ' + t.surf2 + ', 0 0 0 9px ' + tint(0.3);
+      return { label: 'Sphere of mist ' + (i + 1), sel, tile: loaderTile(sel), cls: sel ? (sz ? 'breathe' : 'spin') : '', vis, pick: () => this.setState({ loader: id }) };
+    });
+
+    const loaderIsGrid = s.loader.charAt(0) === 'g';
+    let previewOrb = '';
+    if (!loaderIsGrid) {
+      const src = (s.loader.charAt(0) === 'l' ? lights : mists)[parseInt(s.loader.slice(1), 10) - 1];
+      previewOrb = src.vis.replace(/42px/g, '16px').replace(/36px/g, '16px').replace(/22px/g, '10px');
+    }
+
+    const sw = (on, key) => ({
+      track: 'width: 56px; height: 32px; border-radius: 999px; border: 0; padding: 3px; flex: none; display: flex; align-items: center; justify-content: ' + (on ? 'flex-end' : 'flex-start') + '; background: ' + (on ? accent : t.surf2),
+      knob: 'display:block;width:26px;height:26px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 3px rgba(0,0,0,.3)',
+      toggle: () => this.setState({ [key]: !s[key] })
+    });
+    const chars = sw(s.chars, 'chars'), sounds = sw(s.sounds, 'sounds'), art = sw(s.art, 'art'), glass = sw(s.glass, 'glass');
+
+    const FONTS = {
+      'Rounded': 'ui-rounded, "SF Pro Rounded", Nunito, system-ui, sans-serif',
+      'System': 'system-ui, -apple-system, "Segoe UI", sans-serif',
+      'Serif': '"New York", Newsreader, Georgia, serif',
+      'Mono': '"JetBrains Mono", ui-monospace, Menlo, monospace'
+    };
+
+    return {
+      t, appearanceOpts, lightOpts, darkOpts, accents, grids, lights, mists,
+      loaderIsGrid, loaderIsOrb: !loaderIsGrid, previewOrb,
+      previewCells: gridCells(PATTERNS[0], true, 2.5),
+      fontStack: FONTS[s.font], font: s.font,
+      pickFont: (e) => this.setState({ font: e.target.value }),
+      size: s.size, sizeLabel: s.size === 0 ? 'System' : 'Size ' + (s.size + 1),
+      pickSize: (e) => this.setState({ size: parseInt(e.target.value, 10) || 0 }),
+      bodySize: 14 + s.size, titleSize: 16 + s.size,
+      chars: s.chars, charsTrack: chars.track, charsKnob: chars.knob, toggleChars: chars.toggle,
+      sounds: s.sounds, soundsTrack: sounds.track, soundsKnob: sounds.knob, toggleSounds: sounds.toggle,
+      art: s.art, artTrack: art.track, artKnob: art.knob, toggleArt: art.toggle,
+      glass: s.glass, glassTrack: glass.track, glassKnob: glass.knob, toggleGlass: glass.toggle
+    };
+  }
+}
+</script>
+</body>
+</html>

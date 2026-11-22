@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hermes Desktop · Chat</title>
+<script src="./_runtime/react.js"></script>
+<script src="./_runtime/react-dom.js"></script>
+<script src="./_runtime/support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:ui-rounded,"SF Pro Rounded",Nunito,system-ui,sans-serif}
+a{color:#EE8AB8}a:hover{color:#F6B5D2}
+button{font:inherit;cursor:pointer}
+input{font:inherit}
+input::placeholder{color:inherit;opacity:.75}
+@keyframes hgrid{0%,100%{opacity:.18}50%{opacity:1}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+.breathe{animation:breathe 3.2s ease-in-out infinite}
+.mono{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace}
+.ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+</style>
+</helmet>
+<div style="width: 100%; height: 900px; display: flex; flex-wrap: wrap; background: {{t.bg}}; color: {{t.text}}; overflow: hidden">
+
+<!-- SIDEBAR -->
+<aside style="flex: 1 0 300px; max-width: 320px; height: 100%; box-sizing: border-box; background: {{t.side}}; border-right: 1px solid {{t.line}}; display: flex; flex-direction: column; padding: 14px 14px 12px">
+  <div style="display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 4px">
+    <div style="display: flex; gap: 8px" aria-hidden="true">
+      <span style="width: 12px; height: 12px; border-radius: 50%; background: #FF5F57"></span>
+      <span style="width: 12px; height: 12px; border-radius: 50%; background: #FEBC2E"></span>
+      <span style="width: 12px; height: 12px; border-radius: 50%; background: #28C840"></span>
+    </div>
+    <div style="display: flex; gap: 8px">
+      <button aria-label="Filter sessions" style="width: 40px; height: 40px; border-radius: 50%; border: 1px solid {{t.line}}; background: {{t.surf}}; color: {{t.text}}; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"></path></svg></button>
+      <button aria-label="Search" style="width: 40px; height: 40px; border-radius: 50%; border: 1px solid {{t.line}}; background: {{t.surf}}; color: {{t.text}}; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m20 20-4-4"></path></svg></button>
+      <button aria-label="New chat" style="width: 40px; height: 40px; border-radius: 50%; border: 1px solid {{t.line}}; background: {{t.surf}}; color: {{t.text}}; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+    </div>
+  </div>
+
+  <button style="margin: 14px 0 10px; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px; border: 1px solid {{t.line}}; background: {{t.surf}}; color: {{t.text}}; text-align: left">
+    <span style="width: 30px; height: 30px; border-radius: 9px; background: {{t.surf2}}; display: flex; align-items: center; justify-content: center; flex: none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="2"></rect><rect x="3" y="13" width="18" height="7" rx="2"></rect><path d="M7 7.5h.01M7 16.5h.01"></path></svg></span>
+    <span style="display: flex; flex-direction: column; flex: 1; min-width: 0">
+      <span style="font-size: 14px; font-weight: 700">Main</span>
+      <span class="ell" style="font-size: 12px; color: {{t.muted}}; display: flex; align-items: center; gap: 6px"><span style="width: 7px; height: 7px; border-radius: 50%; background: {{t.ok}}; flex: none"></span>hermes-vps · connected</span>
+    </span>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="color: {{t.muted}}"><path d="m8 10 4 4 4-4"></path></svg>
+  </button>
+
+  <nav aria-label="Agents and sessions" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-top: 6px">
+
+    <!-- Hermes agent -->
+    <div style="display: flex; align-items: center; gap: 12px; padding: 8px 6px">
+      <span class="breathe" style="width: 38px; height: 38px; border-radius: 50%; flex: none; background: radial-gradient(circle at 32% 28%, #F8DCE4 0%, #B9566F 40%, #3B0E1E 80%); box-shadow: inset -4px -6px 12px rgba(0,0,0,.35)"></span>
+      <span style="flex: 1; font-size: 17px; font-weight: 700">Hermes</span>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="#F5C542" aria-label="Pinned" role="img"><path d="M9 3h6l-1 6 4 4H6l4-4-1-6zM12 13v8" stroke="#F5C542" stroke-width="2" stroke-linejoin="round"></path></svg>
+      <span style="font-size: 13px; color: {{t.muted}}">4d</span>
+    </div>
+    <div style="margin-left: 24px; border-left: 1.5px solid {{t.line2}}; display: flex; flex-direction: column; gap: 2px; padding: 2px 0">
+      <button aria-current="page" style="display: flex; align-items: center; gap: 8px; padding: 9px 10px 9px 0; border: 0; border-radius: 0 12px 12px 0; background: {{t.surf}}; color: {{t.text}}; text-align: left">
+        <span style="width: 14px; height: 1.5px; background: {{t.line2}}; flex: none"></span>
+        <span class="ell" style="flex: 1; font-size: 14px; font-weight: 600">Shorten morning news and surf links</span>
+        <span style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.5px; flex: none"><sc-for list="{{gridS}}" as="c" hint-placeholder-count="16"><span style="{{c.style}}"></span></sc-for></span>
+        <span style="font-size: 12px; color: {{t.accentText}}; flex: none">Working</span>
+      </button>
+      <button style="display: flex; align-items: center; gap: 8px; padding: 9px 10px 9px 0; border: 0; background: transparent; color: {{t.text}}; text-align: left">
+        <span style="width: 14px; height: 1.5px; background: {{t.line2}}; flex: none"></span>
+        <span class="ell" style="flex: 1; font-size: 14px">Plot key findings on AI bot accounts</span>
+        <span aria-label="Unread" role="img" style="width: 8px; height: 8px; border-radius: 50%; background: {{t.accent}}; flex: none"></span>
+        <span style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.5px; flex: none"><sc-for list="{{gridS}}" as="c" hint-placeholder-count="16"><span style="{{c.style}}"></span></sc-for></span>
+        <span style="font-size: 12px; color: {{t.accentText}}; flex: none">3m</span>
+      </button>
+      <button style="display: flex; align-items: center; gap: 8px; padding: 9px 10px 9px 0; border: 0; background: transparent; color: {{t.text}}; text-align: left">
+        <span style="width: 14px; height: 1.5px; background: {{t.line2}}; flex: none"></span>
+        <span class="ell" style="flex: 1; font-size: 14px">Call Notion MCP search for Geography</span>
+        <span style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.5px; flex: none"><sc-for list="{{gridS}}" as="c" hint-placeholder-count="16"><span style="{{c.style}}"></span></sc-for></span>
+        <span style="font-size: 12px; color: {{t.accentText}}; flex: none">2m</span>
+      </button>
+      <button style="display: flex; align-items: center; gap: 8px; padding: 9px 10px 9px 0; border: 0; background: transparent; color: {{t.text}}; text-align: left">
+        <span style="width: 14px; height: 1.5px; background: {{t.line2}}; flex: none"></span>
+        <span class="ell" style="flex: 1; font-size: 14px">Hey #2</span>
+        <span style="font-size: 12px; color: {{t.muted}}; flex: none">25m</span>
+      </button>
+      <button style="display: flex; align-items: center; gap: 8px; padding: 9px 10px 9px 0; border: 0; background: transparent; color: {{t.text}}; text-align: left">
+        <span style="width: 14px; height: 1.5px; background: {{t.line2}}; flex: none"></span>
+        <span class="ell" style="flex: 1; font-size: 14px">Connect Discogs account integration</span>
+        <span style="font-size: 12px; color: {{t.muted}}; flex: none">7h</span>
+      </button>
+      <button style="display: flex; align-items: center; gap: 8px; padding: 9px 10px 9px 0; border: 0; background: transparent; color: {{t.muted}}; text-align: left">
+        <span style="width: 14px; height: 1.5px; background: {{t.line2}}; flex: none"></span>
+        <span style="flex: 1; font-size: 14px">234 more sessions</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+      </button>
+    </div>
+
+    <!-- sidequest agent -->
+    <div style="display: flex; align-items: center; gap: 12px; padding: 14px 6px 8px">
+      <span style="width: 38px; height: 38px; border-radius: 50%; flex: none; background: radial-gradient(circle at 34% 30%, #FBF3EA 0%, #B48D70 42%, #3A2516 82%); box-shadow: inset -4px -6px 12px rgba(0,0,0,.35)"></span>
+      <span style="flex: 1; font-size: 17px; font-weight: 700">sidequest</span>
+      <span style="font-size: 13px; color: {{t.muted}}">7h</span>
+    </div>
+    <div style="margin-left: 24px; border-left: 1.5px solid {{t.line2}}; display: flex; flex-direction: column; gap: 2px; padding: 2px 0">
+      <button style="display: flex; align-items: center; gap: 8px; padding: 9px 10px 9px 0; border: 0; background: transparent; color: {{t.text}}; text-align: left">
+        <span style="width: 14px; height: 1.5px; background: {{t.line2}}; flex: none"></span>
+        <span class="ell" style="flex: 1; font-size: 14px">Untitled</span>
+        <span style="font-size: 12px; color: {{t.muted}}; flex: none">8h</span>
+      </button>
+      <button style="display: flex; align-items: center; gap: 8px; padding: 9px 10px 9px 0; border: 0; background: transparent; color: {{t.muted}}; text-align: left">
+        <span style="width: 14px; height: 1.5px; background: {{t.line2}}; flex: none"></span>
+        <span style="flex: 1; font-size: 14px">3 more sessions</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+      </button>
+    </div>
+
+    <!-- helix agent -->
+    <div style="display: flex; align-items: center; gap: 12px; padding: 14px 6px 8px">
+      <span aria-hidden="true" style="width: 38px; height: 30px; border-radius: 9px; flex: none; background: #93CBF1; display: flex; align-items: center; justify-content: center; gap: 4px">
+        <span style="width: 6px; height: 3px; border-radius: 2px; background: #10233A"></span><span style="width: 6px; height: 3px; border-radius: 2px; background: #10233A"></span>
+      </span>
+      <span style="flex: 1; font-size: 17px; font-weight: 700">helix</span>
+      <span style="font-size: 13px; color: {{t.muted}}">17h</span>
+    </div>
+    <div style="margin-left: 24px; border-left: 1.5px solid {{t.line2}}; display: flex; flex-direction: column; gap: 2px; padding: 2px 0">
+      <button style="display: flex; align-items: center; gap: 8px; padding: 9px 10px 9px 0; border: 0; background: transparent; color: {{t.text}}; text-align: left">
+        <span style="width: 14px; height: 1.5px; background: {{t.line2}}; flex: none"></span>
+        <span class="ell" style="flex: 1; font-size: 14px">Untitled</span>
+        <span style="font-size: 12px; color: {{t.muted}}; flex: none">8h</span>
+      </button>
+      <button style="display: flex; align-items: center; gap: 8px; padding: 9px 10px 9px 0; border: 0; background: transparent; color: {{t.text}}; text-align: left">
+        <span style="width: 14px; height: 1.5px; background: {{t.line2}}; flex: none"></span>
+        <span class="ell" style="flex: 1; font-size: 14px">Summarize boss, contract, delivery, and rota</span>
+        <span style="font-size: 12px; color: {{t.muted}}; flex: none">17h</span>
+      </button>
+    </div>
+  </nav>
+
+  <div style="display: flex; align-items: center; gap: 10px; padding-top: 12px; border-top: 1px solid {{t.line}}">
+    <span style="width: 40px; height: 40px; border-radius: 50%; background: {{t.surf}}; border: 1px solid {{t.line}}; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; color: {{t.muted}}; flex: none">JG</span>
+    <span style="flex: 1; font-size: 15px; font-weight: 600">Jack G</span>
+    <a href="Settings.dc.html" aria-label="Settings" style="width: 40px; height: 40px; border-radius: 50%; background: {{t.surf}}; border: 1px solid {{t.line}}; color: {{t.text}}; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg></a>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main style="flex: 999 1 560px; min-width: 0; height: 100%; display: flex; flex-direction: column">
+  <header style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 14px 20px 6px">
+    <span></span>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 7px 18px 7px 8px; border-radius: 999px; background: {{t.surf}}; border: 1px solid {{t.line}}; box-shadow: 0 8px 24px rgba(0,0,0,.25)">
+      <span class="breathe" style="width: 34px; height: 34px; border-radius: 50%; flex: none; background: radial-gradient(circle at 32% 28%, #F8DCE4 0%, #B9566F 40%, #3B0E1E 80%)"></span>
+      <span style="display: flex; flex-direction: column; align-items: center">
+        <span style="font-size: 15px; font-weight: 700">Shorten morning news and surf links</span>
+        <span style="font-size: 12px; color: {{t.muted}}; display: flex; align-items: center; gap: 6px">
+          <span style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.5px"><sc-for list="{{gridS}}" as="c" hint-placeholder-count="16"><span style="{{c.style}}"></span></sc-for></span>
+          Running command · 5:46
+        </span>
+      </span>
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 8px">
+      <button style="height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid {{t.line}}; background: {{t.surf}}; color: {{t.text}}; font-size: 14px; font-weight: 600">Share</button>
+      <button aria-label="More" style="width: 40px; height: 40px; border-radius: 50%; border: 1px solid {{t.line}}; background: {{t.surf}}; color: {{t.text}}; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg></button>
+    </div>
+  </header>
+
+  <section aria-label="Conversation" style="flex: 1; overflow-y: auto; padding: 18px 24px 24px">
+    <div style="max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px">
+
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px">
+        <div style="max-width: 78%; padding: 13px 18px; border-radius: 22px; background: {{t.surf2}}; font-size: 16px; line-height: 1.45">The morning brief is getting long. Can you shorten the news and surf links so each is just the site name and headline?</div>
+        <span style="font-size: 12px; color: {{t.muted}}; padding-right: 6px">22 Nov at 08:02</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <button onClick="{{toggle}}" aria-expanded="{{open}}" style="align-self: stretch; display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 18px; border: 1px solid {{t.accentLine}}; background: {{t.accentSoft}}; color: {{t.text}}; text-align: left">
+          <span style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px"><sc-for list="{{gridStatic}}" as="c" hint-placeholder-count="16"><span style="{{c.style}}"></span></sc-for></span>
+          <span style="flex: 1; font-size: 15px; color: {{t.muted}}">Ran 11 commands and made 7 tool calls</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="color: {{t.muted}}; transform: {{chevron}}"><path d="m6 9 6 6 6-6"></path></svg>
+        </button>
+        <sc-if value="{{open}}" hint-placeholder-val="{{ false }}">
+          <div style="margin-left: 14px; border-left: 1.5px solid {{t.line2}}; display: flex; flex-direction: column; gap: 8px; padding: 2px 0 2px 14px">
+            <div style="display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-radius: 16px; background: {{t.pill}}; border: 1px solid {{t.pillLine}}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{t.ok}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="m7 9 3 3-3 3M12 15h5"></path></svg>
+              <span style="font-size: 14px; font-weight: 700; flex: none">Ran command</span>
+              <span class="mono ell" style="font-size: 13px; color: {{t.muted}}">cd ~/.hermes/cache/scratch &amp;&amp; ls -la</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-radius: 16px; background: {{t.pill}}; border: 1px solid {{t.pillLine}}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{t.ok}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"></path></svg>
+              <span style="font-size: 14px; font-weight: 700; flex: none">Execute code</span>
+              <span class="mono ell" style="font-size: 13px; color: {{t.muted}}">import sqlite3, re, html</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-radius: 16px; background: {{t.pill}}; border: 1px solid {{t.pillLine}}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{t.ok}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"></path></svg>
+              <span style="font-size: 14px; font-weight: 700; flex: none">Cronjob manage</span>
+              <span class="mono ell" style="font-size: 13px; color: {{t.muted}}">{ "action": "update", "job_id": "morning-brief" }</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-radius: 16px; background: {{t.pill}}; border: 1px solid {{t.pillLine}}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{t.ok}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="m7 9 3 3-3 3M12 15h5"></path></svg>
+              <span style="font-size: 14px; font-weight: 700; flex: none">Ran command</span>
+              <span class="mono ell" style="font-size: 13px; color: {{t.muted}}">cd ~ &amp;&amp; (timeout 60 hermes chat …</span>
+            </div>
+          </div>
+        </sc-if>
+        <div style="font-size: 16px; line-height: 1.6; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px">
+          <p style="margin: 0">Done. Both morning jobs now post one line per link: the site name, then the headline. I ran the news job once to check and it reads much more cleanly.</p>
+          <p style="margin: 0">Also available from a shell on the VPS:</p>
+          <ul style="margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px">
+            <li><code class="mono" style="font-size: 14px; padding: 2px 7px; border-radius: 7px; background: {{t.surf}}">hermes sessions list</code> to see recent sessions</li>
+            <li><code class="mono" style="font-size: 14px; padding: 2px 7px; border-radius: 7px; background: {{t.surf}}">hermes --resume 20261122_080205_fb120f</code> to continue this one</li>
+          </ul>
+        </div>
+        <a href="https://example.com" style="display: flex; flex-direction: column; gap: 4px; padding: 14px 18px; border-radius: 18px; background: {{t.surf}}; border: 1px solid {{t.line}}; text-decoration: none; color: {{t.text}}">
+          <span style="font-size: 12px; color: {{t.muted}}; display: flex; align-items: center; gap: 6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"></path></svg>hermes-vps.your-tailnet.ts.net</span>
+          <span style="font-size: 15px; font-weight: 700">Hermes dashboard · Cron jobs</span>
+        </a>
+      </div>
+
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px; padding-top: 6px">
+        <div style="max-width: 78%; padding: 13px 18px; border-radius: 22px; background: {{t.surf2}}; font-size: 16px; line-height: 1.45">Nice. Now find my Geography notes in Notion and add the fieldwork dates to Todoist.</div>
+        <span style="font-size: 12px; color: {{t.muted}}; padding-right: 6px">22 Nov at 08:24</span>
+      </div>
+
+      <div style="margin-left: 14px; border-left: 1.5px solid {{t.line2}}; display: flex; flex-direction: column; gap: 8px; padding: 2px 0 2px 14px">
+        <div style="display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-radius: 16px; background: {{t.pill}}; border: 1px solid {{t.pillLine}}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{t.ok}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"></path></svg>
+          <span style="font-size: 14px; font-weight: 700; flex: none">Tool describe</span>
+          <span class="mono ell" style="font-size: 13px; color: {{t.muted}}">{ "names": [ "mcp__notion__API_post_search" ] }</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-radius: 16px; background: {{t.pill}}; border: 1px solid {{t.pillLine}}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{t.ok}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"></path></svg>
+          <span style="font-size: 14px; font-weight: 700; flex: none">Mcp notion API post search</span>
+          <span class="ell" style="font-size: 14px; color: {{t.muted}}">Geography</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-radius: 16px; background: {{t.accentSoft}}; border: 1px solid {{t.accentLine}}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{t.accentText}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="m7 9 3 3-3 3M12 15h5"></path></svg>
+          <span style="font-size: 14px; font-weight: 700; flex: none">Running command</span>
+          <span class="mono ell" style="flex: 1; font-size: 13px; color: {{t.muted}}">grep -c '^NOTION_API_KEY=' ~/.hermes/.env</span>
+          <span style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; flex: none"><sc-for list="{{gridL}}" as="c" hint-placeholder-count="16"><span style="{{c.style}}"></span></sc-for></span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding-left: 4px; color: {{t.muted}}; font-size: 14px">
+        <span class="breathe" style="width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #FFFFFF 0%, {{t.accent}} 45%, transparent 75%)"></span>
+        Thinking… 0:42
+      </div>
+    </div>
+  </section>
+
+  <div style="padding: 0 24px 20px">
+    <form style="max-width: 760px; margin: 0 auto; display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 30px; background: {{t.surf}}; border: 1px solid {{t.line}}">
+      <button type="button" aria-label="Attach" style="width: 44px; height: 44px; border-radius: 50%; border: 1px solid {{t.line}}; background: {{t.surf2}}; color: {{t.text}}; display: flex; align-items: center; justify-content: center; flex: none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+      <label for="composer" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Message Hermes</label>
+      <input id="composer" type="text" placeholder="Queue a message for Hermes…" style="flex: 1; min-width: 0; height: 44px; border: 0; outline: none; background: transparent; color: {{t.muted}}; font-size: 16px; padding: 0 6px">
+      <button type="button" aria-label="Dictate" style="width: 44px; height: 44px; border-radius: 50%; border: 0; background: transparent; color: {{t.muted}}; display: flex; align-items: center; justify-content: center; flex: none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></button>
+      <button type="button" aria-label="Stop Hermes" style="width: 44px; height: 44px; border-radius: 50%; border: 0; background: {{t.accent}}; color: {{t.onAccent}}; display: flex; align-items: center; justify-content: center; flex: none"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3"></rect></svg></button>
+    </form>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"canvas":{"editor":"enum","options":["Midnight","Black","Gray","White","Paper White"],"default":"Midnight","section":"Look & Feel"},"accent":{"editor":"color","options":["#EE8AB8","#5B7BF5","#5EC8C6","#EFA35A"],"default":"#EE8AB8","section":"Look & Feel"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { open: false };
+  }
+  renderVals() {
+    const C = {
+      'Midnight': { dark: true, bg: '#030320', side: '#06062B', surf: '#1C1A36', surf2: '#272545', line: 'rgba(255,255,255,0.08)', line2: 'rgba(255,255,255,0.16)', text: '#F4F3FA', muted: '#A2A0BE', pill: '#132036', pillLine: 'rgba(70,211,138,0.22)', ok: '#46D38A' },
+      'Black': { dark: true, bg: '#000000', side: '#0A0A0B', surf: '#1A1A1C', surf2: '#252528', line: 'rgba(255,255,255,0.09)', line2: 'rgba(255,255,255,0.17)', text: '#F5F5F7', muted: '#A3A3AA', pill: '#0F1B17', pillLine: 'rgba(70,211,138,0.22)', ok: '#46D38A' },
+      'Gray': { dark: true, bg: '#1C1C1E', side: '#161618', surf: '#2A2A2D', surf2: '#353539', line: 'rgba(255,255,255,0.09)', line2: 'rgba(255,255,255,0.18)', text: '#F5F5F7', muted: '#AEAEB5', pill: '#1F2A26', pillLine: 'rgba(70,211,138,0.24)', ok: '#4FD892' },
+      'White': { dark: false, bg: '#FFFFFF', side: '#F6F6F9', surf: '#F1F0F5', surf2: '#E9E8EF', line: 'rgba(0,0,0,0.08)', line2: 'rgba(0,0,0,0.15)', text: '#15141F', muted: '#5E5C70', pill: '#EEF6F1', pillLine: 'rgba(23,120,74,0.22)', ok: '#17784A' },
+      'Paper White': { dark: false, bg: '#FAF6EE', side: '#F3EEE3', surf: '#EFE9DC', surf2: '#E7E0D1', line: 'rgba(60,40,10,0.09)', line2: 'rgba(60,40,10,0.17)', text: '#1F1B14', muted: '#655D50', pill: '#ECF1E6', pillLine: 'rgba(23,120,74,0.22)', ok: '#17784A' }
+    };
+    const t0 = C[this.props.canvas ?? 'Midnight'] || C['Midnight'];
+    const accent = this.props.accent ?? '#EE8AB8';
+    const h = accent.replace('#', '');
+    const r = parseInt(h.slice(0, 2), 16) || 0, g = parseInt(h.slice(2, 4), 16) || 0, b = parseInt(h.slice(4, 6), 16) || 0;
+    const dark = (k) => '#' + [r, g, b].map((v) => Math.round(v * k).toString(16).padStart(2, '0')).join('');
+    const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    const t = Object.assign({}, t0, {
+      accent: accent,
+      accentText: t0.dark ? accent : dark(0.55),
+      onAccent: lum > 0.55 ? '#14131F' : '#FFFFFF',
+      accentSoft: 'rgba(' + r + ',' + g + ',' + b + ',' + (t0.dark ? 0.13 : 0.1) + ')',
+      accentLine: 'rgba(' + r + ',' + g + ',' + b + ',0.4)'
+    });
+    const cells = (size, animate) => Array.from({ length: 16 }, (_, i) => {
+      const col = i % 4, row = Math.floor(i / 4);
+      const d = ((col + row) * 0.12).toFixed(2);
+      const lit = row === 3 || (row === 2 && col > 1);
+      const base = 'display:block;width:' + size + 'px;height:' + size + 'px;border-radius:' + (size > 3 ? 1.5 : 1) + 'px;background:' + accent + ';';
+      return { style: animate ? base + 'animation:hgrid 1.2s ease-in-out ' + d + 's infinite' : base + 'opacity:' + (lit ? 1 : 0.25) };
+    });
+    return {
+      t: t,
+      gridS: cells(2.5, true),
+      gridL: cells(3.5, true),
+      gridStatic: cells(3.5, false),
+      open: this.state.open,
+      chevron: this.state.open ? 'rotate(180deg)' : 'none',
+      toggle: () => this.setState({ open: !this.state.open })
+    };
+  }
+}
+</script>
+</body>
+</html>
