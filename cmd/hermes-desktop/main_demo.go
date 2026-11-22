@@ -9,6 +9,7 @@ package main
 
 import (
 	"os"
+	"strings"
 	"time"
 
 	"hermes-desktop/internal/core"
@@ -31,6 +32,8 @@ func init() {
 		app.Instances = settings.Instances{List: []settings.Instance{in}}
 		s.ActiveInstance = in.ID
 		s.SetAgentPinned(in.ID, "default", true)
+		// The design's link card; the demo's address resolves nowhere.
+		app.SetLinkTitle("https://hermes-vps.your-tailnet.ts.net/cron", "Hermes dashboard · Cron jobs")
 		if v := os.Getenv("HERMES_DEMO_CANVAS"); v != "" {
 			s.DarkCanvas, s.LightCanvas = v, v
 			if v == "White" || v == "Paper White" {
@@ -42,7 +45,7 @@ func init() {
 		if v := os.Getenv("HERMES_DEMO_ACCENT"); v != "" {
 			s.Accent = v
 		}
-		if os.Getenv("HERMES_DEMO_SCREEN") == "connect" {
+		if strings.HasPrefix(os.Getenv("HERMES_DEMO_SCREEN"), "connect") {
 			app.Instances.List[0].URL = "https://hermes-vps.your-tailnet.ts.net"
 			s.ActiveInstance = ""
 			app.Instances.List = []settings.Instance{{ID: "demo", Name: "Main", URL: "https://hermes-vps.your-tailnet.ts.net", Auth: settings.AuthToken}}
@@ -50,9 +53,11 @@ func init() {
 		return nil
 	}
 	demoUI = func(app *core.App, u *views.UI) {
-		switch os.Getenv("HERMES_DEMO_SCREEN") {
-		case "connect":
+		screen := os.Getenv("HERMES_DEMO_SCREEN")
+		switch screen {
+		case "connect", "connect-dashboard":
 			u.Screen = views.ScreenConnect
+			u.PrefillConnect(true, screen == "connect-dashboard", "https://hermes-vps.your-tailnet.ts.net")
 			return
 		case "settings":
 			u.Screen = views.ScreenSettings
@@ -61,12 +66,39 @@ func init() {
 			return
 		}
 		u.Select(demoSession)
+		if screen == "main-expanded" {
+			go func() {
+				for range 100 {
+					time.Sleep(50 * time.Millisecond)
+					done := make(chan bool, 1)
+					app.Post(func() {
+						ch := app.Conn.Chats[demoSession]
+						ok := ch != nil && ch.Fetched
+						if ok {
+							u.ExpandToolGroups()
+							u.ScrollChatToTop()
+						}
+						done <- ok
+					})
+					if <-done {
+						return
+					}
+				}
+			}()
+		}
 		// Start the design's running turn once the chat is attached.
 		go func() {
 			for range 100 {
 				time.Sleep(50 * time.Millisecond)
 				if demoServer.CallCount("session.resume") > 0 {
 					demoServer.Run(demoSession, "design_turn.jsonl", 150*time.Millisecond)
+					if screen == "prompt" {
+						time.Sleep(2 * time.Second)
+						demoServer.Ask(demoSession, "clarify", map[string]any{"questions": []any{
+							map[string]any{"qid": "q1", "question": "Which Todoist project should the fieldwork dates go in?", "choices": []string{"Inbox", "School", "Geography"}},
+							map[string]any{"qid": "q2", "question": "Anything to add to each task?"},
+						}})
+					}
 					return
 				}
 			}

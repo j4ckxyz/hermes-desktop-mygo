@@ -202,6 +202,13 @@ func main() {
 				opts.Vibrancy = mygo.VibrancySidebar
 			}
 		}
+		// Windows shows a material only in a window created with one, and
+		// such a window has no menu bar (Alt or F10 opens the menus): so
+		// Mica is chosen at launch, from the setting.
+		if runtime.GOOS == "windows" && s.TranslucentSidebar {
+			opts.Vibrancy = mygo.VibrancyMica
+			native.createdWithMaterial = true
+		}
 		if bench != "" {
 			opts.StateKey = ""
 			opts.Width, opts.Height = 1440, 900
@@ -250,6 +257,38 @@ func main() {
 type nativeOS struct {
 	win   *mygo.Window
 	sound *audio.Sound
+	// createdWithMaterial: the Windows window was made with Mica.
+	createdWithMaterial bool
+}
+
+// SetSidebarMaterial turns the sidebar's material on or off. macOS
+// changes it at once. Windows changes it at once in a window created with
+// one; otherwise it takes the next launch.
+func (n *nativeOS) SetSidebarMaterial(on bool) string {
+	switch runtime.GOOS {
+	case "darwin":
+		v := mygo.VibrancyNone
+		if on {
+			v = mygo.VibrancySidebar
+		}
+		n.win.SetVibrancy(v)
+	case "windows":
+		if !n.createdWithMaterial {
+			if on {
+				return "Mica shows the next time Hermes starts."
+			}
+			return ""
+		}
+		v := mygo.VibrancyNone
+		if on {
+			v = mygo.VibrancyMica
+		}
+		n.win.SetVibrancy(v)
+		if !on {
+			return "The menu bar comes back the next time Hermes starts."
+		}
+	}
+	return ""
 }
 
 func (n *nativeOS) Platform() string { return runtime.GOOS }

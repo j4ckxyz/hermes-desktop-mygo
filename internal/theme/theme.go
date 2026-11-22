@@ -7,6 +7,7 @@ package theme
 
 import (
 	"math"
+	"runtime"
 
 	"github.com/egoist/mygo/ui"
 )
@@ -132,7 +133,10 @@ func FontLabel(f string) string {
 	case FontMono:
 		return "Mono"
 	}
-	return "Rounded · Default"
+	if runtime.GOOS == "darwin" {
+		return "SF Rounded · Default" // the system's rounded face
+	}
+	return "Rounded · Default" // the bundled Nunito
 }
 
 // Family returns the CSS-like family list MyGo's Font takes for a choice.

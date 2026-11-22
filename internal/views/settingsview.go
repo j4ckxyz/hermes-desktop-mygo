@@ -23,7 +23,7 @@ var settingsPanes = []struct{ name, icon string }{
 
 func (u *UI) settingsView(c *ui.Context) {
 	pal := &u.pal
-	ui.Column(c).Fill().Children(func() {
+	ui.Column(c).Fill().Background(pal.Bg).Children(func() {
 		ui.Row(c).Height(56).FillWidth().Padding(0, 22).AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(pal.Line).DragWindow().Children(func() {
 			ui.Text(c, "Settings").FontSize(14).FontWeight(700).TextColor(pal.Muted).Grow(1).TextAlign(ui.Center)
 		})
@@ -54,7 +54,7 @@ func (u *UI) settingsView(c *ui.Context) {
 
 func (u *UI) settingsNav(c *ui.Context) {
 	pal := &u.pal
-	ui.Column(c).Width(250).Shrink(0).Padding(20, 14).Gap(4).Label("Settings sections").Children(func() {
+	ui.Column(c).Width(230).Shrink(0).Padding(20, 14).Gap(4).Label("Settings sections").Children(func() {
 		if u.App.Conn != nil {
 			back := ui.Row(c).Gap(10).Padding(10, 12).Margin(0, 0, 10, 0).Radius(12).AlignItems(ui.Center).Cursor(ui.CursorPointer).Focusable().Label("Back to chats")
 			back.Children(func() {
@@ -133,7 +133,8 @@ func (u *UI) lookAndFeel(c *ui.Context) {
 		u.SetSettings(n)
 	}
 	tile := func(bg ui.Color, fg ui.Color, sel bool, split bool) ui.Element {
-		t := ui.Row(c).Height(84).FillWidth().Radius(18).Border(1, pal.Line).Justify(ui.Center).AlignItems(ui.Center).Clip()
+		// The design's tiles are 40 px pills around their "Aa".
+		t := ui.Row(c).Size(40, 84).Radius(18).Border(1, pal.Line).Justify(ui.Center).AlignItems(ui.Center).Clip()
 		if split {
 			t.Draw(func(p *ui.Painter, r ui.Rect) {
 				p.Fill(r, ui.Hex("#FFFFFF"), 18)
@@ -266,7 +267,18 @@ func (u *UI) lookAndFeel(c *ui.Context) {
 				ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
 					ui.Text(c, "A").FontSize(13)
 					v := float64(s.TextSize)
-					sl := ui.Slider(c, &v, 0, theme.MaxTextSize).Step(1).Grow(1).Label("Text size")
+					// The design's slider: a thin grey track and an accent thumb.
+					sl := ui.SliderBase(c, &v, 0, theme.MaxTextSize).Step(1).Grow(1).Height(20).PaddingX(8).Label("Text size")
+					at := float32(v / theme.MaxTextSize)
+					if c.Direction() == ui.RightToLeft {
+						at = 1 - at
+					}
+					line, acc := pal.Line2, pal.Accent
+					sl.Draw(func(p *ui.Painter, r ui.Rect) {
+						p.Fill(ui.Rect{X: r.X + 8, Y: r.Y + 8, W: r.W - 16, H: 4}, line, 2)
+						x := r.X + 8 + (r.W-16)*at
+						p.Fill(ui.Rect{X: x - 7, Y: r.Y + 3, W: 14, H: 14}, acc, 7)
+					})
 					if sl.Changed() {
 						set(func(n *settings.Settings) { n.TextSize = int(v + 0.5) })
 					}
@@ -318,10 +330,16 @@ func (u *UI) lookAndFeel(c *ui.Context) {
 		u.card(c, "Window", "window", func() {
 			u.toggleRow(c, "Translucent sidebar", &s.TranslucentSidebar, func(v bool) { set(func(n *settings.Settings) { n.TranslucentSidebar = v }) })
 			n := "Lets the desktop show through the sidebar on macOS and Windows 11."
-			if u.Native != nil && u.Native.Platform() == "linux" {
+			switch {
+			case u.Native != nil && u.Native.Platform() == "linux":
 				n += " Linux has no window materials, so the sidebar stays opaque here."
+			case u.Native != nil && u.Native.Platform() == "windows":
+				n += " On Windows the menus then open from Alt or F10, as Windows draws no menu bar over Mica."
 			}
 			u.note(c, n)
+			if u.materialNote != "" {
+				ui.Text(c, u.materialNote).FontSize(13).FontWeight(600).TextColor(pal.AccentText)
+			}
 		})
 	})
 }
@@ -483,6 +501,14 @@ func (u *UI) generalPane(c *ui.Context) {
 		if conn != nil {
 			u.note(c, "Connected to "+conn.Instance.Name+" ("+conn.Instance.Host()+") as "+conn.Me.DisplayName+".")
 		}
+		ui.Divider(c)
+		s := u.Settings
+		u.toggleRow(c, "Load link previews", &s.LinkPreviews, func(v bool) {
+			n := u.Settings
+			n.LinkPreviews = v
+			u.SetSettings(n)
+		})
+		u.note(c, "Link cards in replies show the page's title, fetched once, without cookies.")
 		u.note(c, "Keyboard: ⌘/Ctrl+1–9 jumps to the chats in the sidebar (hold the key to see their numbers), ⌘/Ctrl+N starts a chat, ⌘/Ctrl+K searches, ⌘/Ctrl+, opens settings and Esc stops a running agent.")
 	}).FillWidth()
 }

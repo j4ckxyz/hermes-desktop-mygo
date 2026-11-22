@@ -168,7 +168,6 @@ func SphereLoader(c *ui.Context, id string, pal *theme.Palette, size float32, an
 	accent, soft := pal.Accent, pal.AccentTint
 	white := ui.RGB(255, 255, 255)
 	clear := func(col ui.Color) ui.Color { return col.Alpha(0) }
-	bg := pal.Surf2
 	e := ui.Box(c).Size(size, size).Shrink(0)
 	e.Draw(func(p *ui.Painter, r ui.Rect) {
 		now := p.Now()
@@ -234,7 +233,20 @@ func SphereLoader(c *ui.Context, id string, pal *theme.Palette, size float32, an
 			// A dotted ellipse, turning (design: border 2px dotted, rotate(-24deg)).
 			ew, eh := d*0.86, d*0.52
 			rot := (-24 + float64(spin)) * math.Pi / 180
-			p.Fill(ui.Rect{X: cx - ew/2 - 3, Y: cy - eh/2 - 3, W: ew + 6, H: eh + 6}, clear(bg), eh)
+			// box-shadow: 0 0 0 7px surf2, 0 0 0 9px tint: a ring 7–9 px out.
+			ring := &ui.Path{}
+			for k := 0; k <= 72; k++ {
+				th := float64(k) / 72 * 2 * math.Pi
+				ex, ey := float64(ew/2+8)*math.Cos(th), float64(eh/2+8)*math.Sin(th)
+				x := cx + float32(ex*math.Cos(rot)-ey*math.Sin(rot))
+				y := cy + float32(ex*math.Sin(rot)+ey*math.Cos(rot))
+				if k == 0 {
+					ring.MoveTo(x, y)
+				} else {
+					ring.LineTo(x, y)
+				}
+			}
+			p.StrokePath(ring, max(1, d/21), theme.Tint(accent, 0.3))
 			for k := 0; k < 28; k++ {
 				th := float64(k) / 28 * 2 * math.Pi
 				ex, ey := float64(ew/2)*math.Cos(th), float64(eh/2)*math.Sin(th)

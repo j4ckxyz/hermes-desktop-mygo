@@ -73,9 +73,9 @@ func (u *UI) connectView(c *ui.Context) {
 		}}, d/2)
 	})
 	root.Children(func() {
-		ui.Row(c).Height(56).FillWidth().DragWindow()
 		ui.Scroll(c).Grow(1).FillWidth().Children(func() {
-			// Room above the orb, so its glow is not cut by the scroll edge.
+			// The design's column starts 28 px down (the title-bar strip
+			// overlaps it), which also leaves its glow room inside the scroll.
 			ui.Column(c).FillWidth().AlignItems(ui.Center).Padding(28, 24, 40, 24).Children(func() {
 				ui.Column(c).FillWidth().MaxWidth(480).AlignItems(ui.Center).Gap(22).Children(func() {
 					orb := Avatar(c, AvatarStyle{Color: ui.Hex("#B9566F")}, 92, 92, u.Settings.AnimateCharacters, f.busy)
@@ -94,6 +94,8 @@ func (u *UI) connectView(c *ui.Context) {
 				})
 			})
 		})
+		// A strip to drag the window by, over the top of the content.
+		ui.Row(c).Absolute().Top(0).Left(0).Right(0).Height(56).DragWindow()
 	})
 }
 
@@ -186,7 +188,7 @@ func (u *UI) connectCard(c *ui.Context) {
 					ui.Span{Text: ".env", Font: pal.Mono, Size: 12, Background: pal.Surf2, Radius: 6, PaddingX: 6, Color: pal.Text},
 					ui.Span{Text: " file where Hermes runs, for example "},
 					ui.Span{Text: "~/.hermes/.env", Font: pal.Mono, Size: 12, Background: pal.Surf2, Radius: 6, PaddingX: 6, Color: pal.Text},
-					ui.Span{Text: ": the value of HERMES_DASHBOARD_SESSION_TOKEN."},
+					ui.Span{Text: "."},
 				).FontSize(13).LineHeight(1.5).TextColor(pal.Muted)
 				if f.local {
 					label := "Read it from ~/.hermes/.env"

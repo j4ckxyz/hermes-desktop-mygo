@@ -34,8 +34,8 @@ type chatRow struct {
 	turn  *transcript.Turn
 	text  string // a reply chunk, or a link's URL
 	chunk int
-	last  bool // the reply's last chunk (streams while running)
-	first bool // the first row of a turn after the first turn
+	last  bool    // the reply's last chunk (streams while running)
+	top   float32 // room above the row (the design's gaps)
 }
 
 func (r chatRow) key() any {
@@ -45,19 +45,39 @@ func (r chatRow) key() any {
 // chatRows lays a chat's turns out as list rows: a long reply becomes a
 // row per group of paragraphs, so the list never builds a whole long
 // message for a sliver of it (MyGo issue #1471).
+//
+// Spacing follows the design: 18 between the user's message and the
+// agent's reply and between turns (24 before a later user message), 10
+// between the parts of a reply, 18 before "Thinking…" and cards.
 func (u *UI) chatRows(ch *core.Chat) []chatRow {
 	var rows []chatRow
-	for ti, t := range ch.Turns {
+	afterUser := true
+	add := func(r chatRow) {
+		switch {
+		case len(rows) == 0:
+			r.top = 0
+		case r.kind == cUser:
+			r.top = 24
+		case r.kind == cThinking || r.kind == cPrompt || r.kind == cError || afterUser:
+			r.top = 18
+		default:
+			r.top = 10
+		}
+		afterUser = r.kind == cUser
+		rows = append(rows, r)
+	}
+	for _, t := range ch.Turns {
+		afterUser = true // a reply's first part sits 18 below what came before
 		if t.User != "" {
-			rows = append(rows, chatRow{kind: cUser, turn: t, first: ti > 0})
+			add(chatRow{kind: cUser, turn: t})
 		}
 		if len(t.Tools) > 0 {
 			if t.Running() {
-				rows = append(rows, chatRow{kind: cTools, turn: t})
+				add(chatRow{kind: cTools, turn: t})
 			} else {
-				rows = append(rows, chatRow{kind: cGroup, turn: t})
+				add(chatRow{kind: cGroup, turn: t})
 				if u.openGroups[t.ID] {
-					rows = append(rows, chatRow{kind: cTools, turn: t})
+					add(chatRow{kind: cTools, turn: t})
 				}
 			}
 		}
@@ -67,17 +87,17 @@ func (u *UI) chatRows(ch *core.Chat) []chatRow {
 			if isBareURL(ck) {
 				kind = cLink
 			}
-			rows = append(rows, chatRow{kind: kind, turn: t, text: ck, chunk: i, last: i == len(chunks)-1})
+			add(chatRow{kind: kind, turn: t, text: ck, chunk: i, last: i == len(chunks)-1})
 		}
 		if t.Prompt != nil {
-			rows = append(rows, chatRow{kind: cPrompt, turn: t})
+			add(chatRow{kind: cPrompt, turn: t})
 		}
 		// "Thinking…" until the reply starts, or while a tool runs after it.
 		if t.Running() && t.Prompt == nil && (t.Text == "" || activity(t) != "Writing") {
-			rows = append(rows, chatRow{kind: cThinking, turn: t})
+			add(chatRow{kind: cThinking, turn: t})
 		}
 		if t.Error != "" || t.Status == transcript.Interrupted {
-			rows = append(rows, chatRow{kind: cError, turn: t})
+			add(chatRow{kind: cError, turn: t})
 		}
 	}
 	return rows
@@ -150,7 +170,7 @@ func (u *UI) mainView(c *ui.Context) {
 	pal := &u.pal
 	ui.Row(c).Fill().AlignItems(ui.Stretch).Children(func() {
 		u.sidebarView(c, conn)
-		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).FillHeight().Background(pal.Bg).Children(func() {
+		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).FillHeight().Background(pal.Bg).Children(func() { // opaque beside a translucent sidebar
 			if u.Selected == "" {
 				u.newChatView(c, conn)
 				return
@@ -177,14 +197,10 @@ func (u *UI) chatView(c *ui.Context, conn *core.Connection, ch *core.Chat) {
 	ls.FollowAnimation = &ui.Smooth
 	list := ui.List(c, ls, len(rows), func(i int) {
 		r := rows[i]
-		ui.Column(c).FillWidth().AlignItems(ui.Center).Children(func() {
-			col := ui.Column(c).FillWidth().MaxWidth(contentWidth)
-			if r.first {
-				col.Padding(6, 0, 0, 0)
-			}
-			col.Children(func() { u.chatRow(c, conn, ch, r) })
+		ui.Column(c).FillWidth().AlignItems(ui.Center).Padding(r.top, 0, 0, 0).Children(func() {
+			ui.Column(c).FillWidth().MaxWidth(contentWidth).Children(func() { u.chatRow(c, conn, ch, r) })
 		})
-	}).Grow(1).Padding(18, 24, 24, 24).Gap(18).Label("Conversation")
+	}).Grow(1).Padding(18, 24, 24, 24).Label("Conversation")
 	switch {
 	case !ch.Loaded && ch.Err == nil:
 		list.Children(func() {
@@ -285,16 +301,16 @@ func (u *UI) listFor(id string) *ui.ListState {
 
 // activity says what a running turn is doing, for the header.
 func activity(t *transcript.Turn) string {
+	if t.Prompt != nil {
+		return "Waiting for you"
+	}
 	for i := len(t.Tools) - 1; i >= 0; i-- {
 		tl := t.Tools[i]
 		if tl.Status == transcript.ToolRunning || tl.Status == transcript.ToolGenerating {
 			return transcript.LabelOf(tl).Title
 		}
 	}
-	switch {
-	case t.Prompt != nil:
-		return "Waiting for you"
-	case t.Text != "":
+	if t.Text != "" {
 		return "Writing"
 	}
 	return "Thinking"
@@ -337,6 +353,7 @@ func (u *UI) chatRow(c *ui.Context, conn *core.Connection, ch *core.Chat, r chat
 		})
 		if g.Clicked() {
 			u.openGroups[t.ID] = !open
+			u.listFor(ch.ID).HoldPlace() // keep the group under the pointer
 		}
 
 	case cTools:
@@ -410,6 +427,7 @@ func (u *UI) mdOptions(c *ui.Context) *markdown.Options {
 			FontSize: pal.Scale(16), Font: pal.Font, CodeFont: pal.Mono, LineHeight: 1.6,
 			Text: pal.Text, Muted: pal.Muted, Link: pal.AccentText, Strong: pal.Text,
 			Code: pal.Text, CodeBackground: pal.Surf, CodeSize: 0.875,
+			BlockSpacing: 0.625, ItemSpacing: 0.375, // 10 px and 6 px at 16 px
 		},
 		OnLink: func(dest string) { c.OpenURL(dest) },
 		LinkMenu: func(m *ui.Menu, dest string) {
@@ -507,7 +525,10 @@ func (u *UI) toolPill(c *ui.Context, tl *transcript.Tool) {
 func (u *UI) linkCard(c *ui.Context, raw string) {
 	pal := &u.pal
 	pu, _ := url.Parse(raw)
-	title := linkTitle(pu)
+	title := u.App.LinkTitle(raw)
+	if title == "" {
+		title = linkTitle(pu)
+	}
 	card := ui.Column(c).FillWidth().Gap(4).Padding(14, 18).Radius(18).Background(pal.Surf).Border(1, pal.Line).
 		Cursor(ui.CursorPointer).Focusable().Label("Open " + raw).Role(ui.RoleLink)
 	if card.Hovered() {
@@ -553,20 +574,61 @@ func linkTitle(u *url.URL) string {
 	return transcript.Humanize(host) + " · " + transcript.Humanize(strings.ReplaceAll(last, "-", "_"))
 }
 
-// promptCard shows an approval or a question the agent is waiting on.
+// promptForm is what the user has typed or picked on a card so far.
+type promptForm struct {
+	value  string                     // sudo password, secret, or a free-text answer
+	text   map[string]*string         // per question: free text
+	picked map[string]map[string]bool // per question: chosen choices
+}
+
+func (u *UI) formFor(id string) *promptForm {
+	if u.forms == nil {
+		u.forms = map[string]*promptForm{}
+	}
+	f := u.forms[id]
+	if f == nil {
+		f = &promptForm{text: map[string]*string{}, picked: map[string]map[string]bool{}}
+		u.forms[id] = f
+	}
+	return f
+}
+
+// dropForm forgets a card's form, wiping a password or secret first.
+func (u *UI) dropForm(id string) {
+	if f := u.forms[id]; f != nil {
+		f.value = ""
+		delete(u.forms, id)
+	}
+}
+
+// promptCard shows what the agent is waiting on: an approval, a question
+// (or a batch of them), a sudo password or a secret.
 func (u *UI) promptCard(c *ui.Context, conn *core.Connection, ch *core.Chat, t *transcript.Turn) {
 	pal := &u.pal
 	p := t.Prompt
-	ui.Column(c).FillWidth().Gap(12).Padding(16, 18).Radius(18).Background(pal.Surf).Border(1, pal.AccentLine).Children(func() {
-		title := "Hermes wants to run this"
-		if p.Kind == "clarify" {
-			title = "Hermes has a question"
+	f := u.formFor(p.PromptID)
+	answer := func(v string) {
+		conn.Answer(ch.ID, v)
+		u.dropForm(p.PromptID)
+	}
+	title, iconName := "Hermes wants to run this", "shield"
+	switch p.Kind {
+	case "clarify", "questions":
+		title, iconName = "Hermes has a question", "pulse"
+		if len(p.Questions) > 1 {
+			title = "Hermes has " + itoa(len(p.Questions)) + " questions"
 		}
+	case "sudo":
+		title, iconName = "Hermes needs your sudo password", "key"
+	case "secret":
+		title, iconName = "Hermes needs "+p.EnvVar, "key"
+	}
+	ui.Column(c).FillWidth().Gap(12).Padding(16, 18).Radius(18).Background(pal.Surf).Border(1, pal.AccentLine).Role(ui.RoleGroup).Label(title).Children(func() {
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-			Icon(c, "shield", 18, pal.AccentText)
+			Icon(c, iconName, 18, pal.AccentText)
 			ui.Text(c, title).FontSize(15).FontWeight(700)
 		})
-		if p.Question != "" {
+		if p.Question != "" && p.Kind != "questions" {
 			ui.Text(c, p.Question).FontSize(15).Selectable()
 		}
 		if p.Description != "" {
@@ -575,26 +637,146 @@ func (u *UI) promptCard(c *ui.Context, conn *core.Connection, ch *core.Chat, t *
 		if p.Command != "" {
 			ui.Text(c, p.Command).Font(pal.Mono).FontSize(13).Padding(10, 14).Radius(12).Background(pal.Surf2).FillWidth().Selectable()
 		}
-		ui.Row(c).Gap(8).Wrap().Children(func() {
-			for _, choice := range p.Choices {
-				label := choiceLabel(choice)
-				var b ui.Element
-				if choice == "once" || (p.Kind == "clarify" && b.ID() == 0) {
-					b = ui.PrimaryButton(c, label)
-				} else {
-					b = ui.Button(c, label)
-				}
-				if b.Clicked() {
-					conn.Answer(ch.ID, choice)
-				}
+		switch p.Kind {
+		case "sudo", "secret":
+			ph, send := "Password", "Run with sudo"
+			if p.Kind == "secret" {
+				ph, send = p.EnvVar, "Send"
 			}
-			if p.Kind == "clarify" && len(p.Choices) == 0 {
+			in := u.field(c, &f.value, ph, ph, true).AutoFocus()
+			submitted := in.Submitted()
+			ui.Row(c).Gap(8).Children(func() {
+				if ui.PrimaryButton(c, send).Disabled(f.value == "").Clicked() || (submitted && f.value != "") {
+					answer(f.value)
+				}
 				if ui.Button(c, "Skip").Clicked() {
-					conn.Answer(ch.ID, "")
+					answer("")
+				}
+			})
+			note := "Sent to " + conn.Instance.Name + " for this command only. Hermes Desktop does not keep it."
+			if p.Kind == "secret" {
+				note = "Sent to " + conn.Instance.Name + ", which keeps it as " + p.EnvVar + ". Hermes Desktop does not keep it."
+			}
+			u.note(c, note)
+
+		case "questions":
+			for _, q := range p.Questions {
+				u.questionField(c, f, q)
+			}
+			ui.Row(c).Gap(8).Children(func() {
+				if ui.PrimaryButton(c, "Send answers").Clicked() {
+					answers := map[string]*string{}
+					for _, q := range p.Questions {
+						answers[q.QID] = f.answerFor(q)
+					}
+					conn.AnswerQuestions(ch.ID, answers)
+					u.dropForm(p.PromptID)
+				}
+				if ui.Button(c, "Skip").Clicked() {
+					conn.AnswerQuestions(ch.ID, nil)
+					u.dropForm(p.PromptID)
+				}
+			})
+
+		case "clarify":
+			if len(p.Choices) == 0 {
+				in := u.field(c, &f.value, "Answer", "Your answer", false).AutoFocus()
+				submitted := in.Submitted()
+				ui.Row(c).Gap(8).Children(func() {
+					if ui.PrimaryButton(c, "Send").Disabled(f.value == "").Clicked() || (submitted && f.value != "") {
+						answer(f.value)
+					}
+					if ui.Button(c, "Skip").Clicked() {
+						answer("")
+					}
+				})
+				return
+			}
+			fallthrough
+		default:
+			ui.Row(c).Gap(8).Wrap().Children(func() {
+				for i, choice := range p.Choices {
+					var b ui.Element
+					if choice == "once" || (p.Kind == "clarify" && i == 0) {
+						b = ui.PrimaryButton(c, choiceLabel(choice))
+					} else {
+						b = ui.Button(c, choiceLabel(choice))
+					}
+					if b.Clicked() {
+						answer(choice)
+					}
+				}
+			})
+		}
+	})
+}
+
+// questionField is one question of a batch: choice chips or a text field.
+func (u *UI) questionField(c *ui.Context, f *promptForm, q hermes.Question) {
+	pal := &u.pal
+	ui.Column(c).Gap(8).Children(func() {
+		ui.Text(c, q.Question).FontSize(15).FontWeight(600)
+		if len(q.Choices) == 0 {
+			if f.text[q.QID] == nil {
+				f.text[q.QID] = new(string)
+			}
+			u.field(c, f.text[q.QID], q.Question, "Your answer", false)
+			return
+		}
+		if f.picked[q.QID] == nil {
+			f.picked[q.QID] = map[string]bool{}
+		}
+		picked := f.picked[q.QID]
+		ui.Row(c).Gap(8).Wrap().Role(ui.RoleGroup).Label(q.Question).Children(func() {
+			for _, choice := range q.Choices {
+				on := picked[choice]
+				chip := ui.Row(c).Height(36).Padding(0, 14).Radius(999).AlignItems(ui.Center).Cursor(ui.CursorPointer).
+					Focusable().Label(choice).AccessSelected(on)
+				if q.MultiSelect {
+					chip.Role(ui.RoleCheckBox).Checked(on)
+				} else {
+					chip.Role(ui.RoleRadio).Checked(on)
+				}
+				if on {
+					chip.Background(pal.Accent.Alpha(0.14)).Border(1, pal.Accent.Alpha(0.55))
+				} else {
+					chip.Border(1, pal.Line2)
+				}
+				chip.Children(func() {
+					col := pal.Text
+					if on {
+						col = pal.AccentText
+					}
+					ui.Text(c, choice).FontSize(14).FontWeight(600).TextColor(col)
+				})
+				if chip.Clicked() || chip.Shortcut(0, ui.KeySpace) {
+					if !q.MultiSelect {
+						clear(picked)
+					}
+					picked[choice] = !on
 				}
 			}
 		})
 	})
+}
+
+// answerFor is a question's answer: the chosen choices (joined), or the
+// text typed, or nil when it was left blank (skipped).
+func (f *promptForm) answerFor(q hermes.Question) *string {
+	var parts []string
+	for _, choice := range q.Choices {
+		if f.picked[q.QID][choice] {
+			parts = append(parts, choice)
+		}
+	}
+	if t := f.text[q.QID]; t != nil && strings.TrimSpace(*t) != "" {
+		parts = append(parts, strings.TrimSpace(*t))
+	}
+	if len(parts) == 0 {
+		return nil
+	}
+	a := strings.Join(parts, ", ")
+	return &a
 }
 
 func choiceLabel(choice string) string {

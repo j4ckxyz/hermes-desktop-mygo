@@ -31,6 +31,10 @@ type Native interface {
 	SaveText(suggestedName, content string) error
 	// Platform is "darwin", "windows" or "linux".
 	Platform() string
+	// SetSidebarMaterial shows the system material behind the sidebar
+	// (macOS vibrancy, Windows 11 Mica) or removes it. It reports a note
+	// when the change needs a restart to take full effect, else "".
+	SetSidebarMaterial(on bool) string
 }
 
 // UI is the window's view state.
@@ -59,6 +63,10 @@ type UI struct {
 	draft      string // the new chat's composer text
 	renaming   string
 	renameText string
+	// materialNote says when the sidebar material needs a restart.
+	materialNote string
+	// forms holds what is typed on prompt cards, by prompt id.
+	forms map[string]*promptForm
 	// focusComposer moves the keyboard to the message box next frame.
 	focusComposer bool
 
@@ -97,6 +105,9 @@ func (u *UI) SetSettings(s settings.Settings) {
 	if s == u.Settings {
 		return
 	}
+	if s.TranslucentSidebar != u.Settings.TranslucentSidebar && u.Native != nil {
+		u.materialNote = u.Native.SetSidebarMaterial(s.TranslucentSidebar)
+	}
 	u.Settings = s
 	if u.SettingsChanged != nil {
 		u.SettingsChanged(s)
@@ -111,12 +122,22 @@ func (u *UI) View(c *ui.Context) {
 	c.SetTheme(u.pal.UITheme())
 	pal := &u.pal
 
+	u.App.LinkPreviews = u.Settings.LinkPreviews
 	u.keys(c)
 	if u.SidebarShown != nil && u.sidebarDrawn == 1 {
 		u.sidebarDrawn = 2
 		u.SidebarShown()
 	}
-	ui.Column(c).Fill().Background(pal.Bg).Children(func() {
+	// With the material showing, the root lets it through and each part
+	// paints its own background: the chat and settings opaque, the sidebar
+	// a light tint over the material.
+	root := ui.Column(c).Fill()
+	if u.Settings.TranslucentSidebar && c.Vibrancy() {
+		c.Root().Background(ui.Transparent)
+	} else {
+		root.Background(pal.Bg)
+	}
+	root.Children(func() {
 		switch u.Screen {
 		case ScreenConnect:
 			u.connectView(c)
@@ -357,4 +378,29 @@ func fileName(title string) string {
 		return "Chat"
 	}
 	return string(out)
+}
+
+// ExpandToolGroups opens every finished turn's tool group in the open
+// chat (the design's "expanded" state; also used by the demo build).
+func (u *UI) ExpandToolGroups() {
+	if c := u.App.Conn; c != nil {
+		if ch := c.Chats[u.Selected]; ch != nil {
+			for _, t := range ch.Turns {
+				u.openGroups[t.ID] = true
+			}
+		}
+	}
+}
+
+// ScrollChatToTop shows the start of the open chat.
+func (u *UI) ScrollChatToTop() {
+	if u.Selected != "" {
+		u.listFor(u.Selected).ScrollTo(0, ui.Start)
+	}
+}
+
+// PrefillConnect fills the connect form (the demo build shows the
+// design's states with it).
+func (u *UI) PrefillConnect(remote, password bool, address string) {
+	u.connect.local, u.connect.password, u.connect.address = !remote, password, address
 }

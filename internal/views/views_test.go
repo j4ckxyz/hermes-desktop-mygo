@@ -105,6 +105,7 @@ type harness struct {
 }
 
 type fakeNative struct {
+	material []bool
 	confirms []string
 	saved    map[string]string
 	answer   bool
@@ -122,6 +123,10 @@ func (f *fakeNative) SaveText(name, content string) error {
 	return nil
 }
 func (f *fakeNative) Platform() string { return "linux" }
+func (f *fakeNative) SetSidebarMaterial(on bool) string {
+	f.material = append(f.material, on)
+	return ""
+}
 
 func newHarness(t *testing.T, opt hermestest.Options, connected bool) *harness {
 	t.Helper()
@@ -394,5 +399,97 @@ func TestToolGroupExpands(t *testing.T) {
 	h.tt.Frame()
 	if !h.tt.HasText("hermes cron show morning-0") {
 		t.Fatalf("expanded pills: %q", h.tt.Texts())
+	}
+}
+
+func TestPromptCards(t *testing.T) {
+	h := newHarness(t, hermestest.Options{Reply: "design_turn.jsonl", Delay: time.Millisecond}, true)
+	h.synced()
+	id := "20261122_060000_0a0b0c"
+	h.u.Select(id)
+	h.settle("chat", func() bool { ch := h.app.Conn.Chats[id]; return ch != nil && ch.Fetched })
+	h.tt.Type("install jq")
+	h.tt.Key(0, ui.KeyEnter)
+	h.settle("running", func() bool { return h.tt.HasText("Running command") })
+
+	// sudo: a masked field; Enter sends the password, which then leaves memory.
+	rid := h.srv.Ask(id, "sudo", map[string]any{"command": "apt install jq"})
+	h.settle("sudo card", func() bool { return h.tt.HasText("Hermes needs your sudo password") })
+	if !h.tt.HasText("apt install jq") {
+		t.Fatal("the command shows")
+	}
+	h.tt.Type("hunter2")
+	if h.tt.HasText("hunter2") {
+		t.Fatal("the password must be masked")
+	}
+	h.tt.Key(0, ui.KeyEnter)
+	h.settle("sudo reply", func() bool { return h.srv.Response(rid) != nil })
+	if string(h.srv.Response(rid)) != `{"value":"hunter2"}` {
+		t.Fatalf("%s", h.srv.Response(rid))
+	}
+	if len(h.u.forms) != 0 {
+		t.Fatal("the form (and the password in it) is dropped once sent")
+	}
+
+	// A secret, skipped.
+	rid = h.srv.Ask(id, "secret", map[string]any{"env_var": "NOTION_API_KEY", "prompt": "Paste your Notion integration key"})
+	h.settle("secret card", func() bool { return h.tt.HasText("Hermes needs NOTION_API_KEY") })
+	if err := h.tt.Click("Skip"); err != nil {
+		t.Fatal(err)
+	}
+	h.settle("secret reply", func() bool { return h.srv.Response(rid) != nil })
+	if string(h.srv.Response(rid)) != `{"value":""}` {
+		t.Fatalf("%s", h.srv.Response(rid))
+	}
+
+	// Two questions: a choice picked, a text left blank (skipped).
+	rid = h.srv.Ask(id, "clarify", map[string]any{"questions": []any{
+		map[string]any{"qid": "q1", "question": "Which Todoist project?", "choices": []string{"Inbox", "School"}},
+		map[string]any{"qid": "q2", "question": "Anything to add?"},
+	}})
+	h.settle("questions", func() bool { return h.tt.HasText("Hermes has 2 questions") })
+	if err := h.tt.Click("School"); err != nil {
+		t.Fatal(err)
+	}
+	h.tt.Frame()
+	if err := h.tt.Click("Send answers"); err != nil {
+		t.Fatal(err)
+	}
+	h.settle("answers", func() bool { return h.srv.Response(rid) != nil })
+	if got := string(h.srv.Response(rid)); got != `{"answers":{"q1":"School","q2":null},"outcome":"submitted"}` {
+		t.Fatalf("%s", got)
+	}
+}
+
+func TestTranslucentSidebarAppliesLive(t *testing.T) {
+	h := newHarness(t, hermestest.Options{}, true)
+	h.synced()
+	h.u.Screen = ScreenSettings
+	h.tt.SetSize(1440, 1800)
+	h.tt.Frame()
+	sw, ok := h.tt.AccessByRole(ui.RoleSwitch, "Translucent sidebar")
+	if !ok {
+		t.Fatal("the switch is labelled")
+	}
+	h.tt.ClickAt(sw.Bounds.X+sw.Bounds.W/2, sw.Bounds.Y+sw.Bounds.H/2)
+	h.tt.Frame()
+	if !h.u.Settings.TranslucentSidebar || len(h.fake.material) != 1 || !h.fake.material[0] {
+		t.Fatalf("setting %v, native calls %v", h.u.Settings.TranslucentSidebar, h.fake.material)
+	}
+	// With the material showing, the main screen still draws (transparent
+	// root, tinted sidebar, opaque chat).
+	h.tt.SetVibrancy(true)
+	h.u.Screen = ScreenMain
+	h.tt.Frame()
+	if !h.tt.HasText("Shorten morning news and surf links") {
+		t.Fatal("sidebar over the material")
+	}
+	h.tt.ClickAt(sw.Bounds.X+sw.Bounds.W/2, sw.Bounds.Y+sw.Bounds.H/2) // not on settings: no effect
+	h.u.Screen = ScreenSettings
+	h.tt.Frame()
+	h.tt.ClickAt(sw.Bounds.X+sw.Bounds.W/2, sw.Bounds.Y+sw.Bounds.H/2)
+	h.tt.Frame()
+	if h.u.Settings.TranslucentSidebar || len(h.fake.material) != 2 || h.fake.material[1] {
+		t.Fatalf("off again: %v", h.fake.material)
 	}
 }

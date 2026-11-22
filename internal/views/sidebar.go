@@ -145,7 +145,7 @@ func artwork(p *ui.Painter, r ui.Rect, pal *theme.Palette) {
 	if r.H < 200 {
 		return
 	}
-	col := pal.Line
+	col := pal.Line.Alpha(float32(pal.Line.A) / 255 * 0.55)
 	cx, cy := r.X+r.W*0.78, r.Y+r.H-40
 	for i, rad := range []float32{150, 105, 62} {
 		path := &ui.Path{}
@@ -162,13 +162,10 @@ func artwork(p *ui.Painter, r ui.Rect, pal *theme.Palette) {
 		}
 		p.StrokePath(path, 1.2, col)
 	}
-	p.FillRadialGradient(ui.Rect{X: cx - 22, Y: cy - 40, W: 44, H: 44}, ui.RadialGradient{Stops: []ui.GradientStop{
-		gs(pal.Accent.Alpha(0.16), 0), gs(pal.Accent.Alpha(0), 1),
-	}}, 22)
 	stars := [][2]float32{{0.12, -210}, {0.3, -150}, {0.52, -250}, {0.2, -90}, {0.6, -120}, {0.42, -40}}
 	for _, s := range stars {
 		x, y := r.X+r.W*s[0], r.Y+r.H+s[1]
-		p.Fill(ui.Rect{X: x - 1.2, Y: y - 1.2, W: 2.4, H: 2.4}, pal.Line2, 1.2)
+		p.Fill(ui.Rect{X: x - 1, Y: y - 1, W: 2, H: 2}, pal.Line, 1)
 	}
 }
 
@@ -214,7 +211,7 @@ func (u *UI) sidebarView(c *ui.Context, conn *core.Connection) {
 	side := ui.Column(c).Width(sidebarWidth).FillHeight().Shrink(0).Background(pal.Side).
 		BorderWidth(0, 1, 0, 0).BorderColor(pal.Line).Padding(14, 14, 12, 14)
 	if u.Settings.TranslucentSidebar && c.Vibrancy() {
-		side.Background(ui.Transparent)
+		side.Background(pal.Side.Alpha(0.35)) // the canvas, faintly, over the material
 	}
 	side.Children(func() {
 		// Title row: room for the traffic lights on macOS, then the buttons.
@@ -396,7 +393,7 @@ func (u *UI) agentRow(c *ui.Context, conn *core.Connection, r sideRow, now inter
 		Avatar(c, avatarStyle(prof, r.profile), 38, map[bool]float32{true: 30, false: 38}[avatarStyle(prof, r.profile).Bot], u.Settings.AnimateCharacters, working && u.Settings.AnimateCharacters)
 		ui.Text(c, name).FontSize(17).FontWeight(700).Grow(1).Shrink(1).MinWidth(0).SingleLine().Ellipsis("…")
 		if u.Settings.AgentPinned(conn.Instance.ID, r.profile) {
-			ui.Icon(c, icon("pin")).Size(15, 15).Shrink(0).Label("Pinned")
+			ui.Icon(c, icon("pin")).Size(15, 15).TextColor(ui.Hex("#F5C542")).Shrink(0).Label("Pinned")
 		}
 		if !lastAct.IsZero() {
 			ui.Text(c, relTime(c.Now(), lastAct.Time)).FontSize(13).TextColor(pal.Muted).Shrink(0)
