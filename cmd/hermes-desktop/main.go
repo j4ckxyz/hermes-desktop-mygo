@@ -9,13 +9,16 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/audio"
 	"github.com/egoist/mygo/ui"
 
+	"hermes-desktop/internal/appicon"
 	"hermes-desktop/internal/cache"
 	"hermes-desktop/internal/core"
 	"hermes-desktop/internal/secrets"
@@ -165,7 +168,7 @@ func main() {
 				log.Fatal(err)
 			}
 		}
-		native := &nativeOS{}
+		native := &nativeOS{iconDir: filepath.Dir(l.paths.cache)}
 		app.Notify = func(title, body string) {
 			if u == nil || (win != nil && win.IsFocused()) {
 				return
@@ -224,6 +227,7 @@ func main() {
 			win.Update(fn)
 		}
 		native.win = win
+		native.SetAppIcon(s.AppIcon)
 		if demoUI != nil {
 			demoUI(app, u)
 		}
@@ -259,6 +263,38 @@ type nativeOS struct {
 	sound *audio.Sound
 	// createdWithMaterial: the Windows window was made with Mica.
 	createdWithMaterial bool
+	iconSeq             atomic.Int64 // the latest SetAppIcon (only the last one applies)
+	iconDir             string       // where drawn icons are kept
+}
+
+// SetAppIcon draws the icon in a colour off the main thread and sets it
+// on the window (title bar, taskbar) and, on macOS, the Dock.
+func (n *nativeOS) SetAppIcon(colour string) {
+	seq := n.iconSeq.Add(1)
+	win := n.win
+	dir := n.iconDir
+	go func() {
+		// Drawn once per colour, then read from the cache directory.
+		path := ""
+		if dir != "" {
+			path = filepath.Join(dir, "icon-"+strings.ToLower(colour)+"-v1.png")
+		}
+		png, err := os.ReadFile(path)
+		if err != nil || len(png) == 0 {
+			png = appicon.PNG(256, appicon.Options{Colour: colour})
+			if path != "" {
+				os.WriteFile(path, png, 0o644)
+			}
+		}
+		if n.iconSeq.Load() != seq || win == nil {
+			return // a newer colour was picked meanwhile
+		}
+		if runtime.GOOS == "darwin" {
+			mygo.App.Dock.SetIcon(png)
+			return
+		}
+		win.SetIcon(png)
+	}()
 }
 
 // SetSidebarMaterial turns the sidebar's material on or off. macOS

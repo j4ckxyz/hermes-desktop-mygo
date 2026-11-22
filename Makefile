@@ -3,7 +3,7 @@ GO ?= go
 PKG := ./cmd/hermes-desktop
 LDFLAGS := -s -w -X main.version=$(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
-.PHONY: all build test vet check cross demo screenshots bench clean
+.PHONY: all build test vet check cross demo screenshots bench icon clean
 
 all: check build
 
@@ -39,6 +39,12 @@ screenshots:
 
 bench:
 	$(GO) run ./cmd/hermes-bench
+
+# The app icon (drawn by internal/appicon) as files: the 1024 px PNG the
+# packager uses (resources/icon.png) and the README's copies.
+icon:
+	$(GO) run ./cmd/hermes-icon -size 1024 -o assets/icon.png -sheet assets/icon-colours.png
+	cp assets/icon.png resources/icon.png
 
 clean:
 	rm -rf bin dist screenshots/local

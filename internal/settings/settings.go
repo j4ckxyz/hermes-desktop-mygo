@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"hermes-desktop/internal/appicon"
 	"hermes-desktop/internal/theme"
 )
 
@@ -29,17 +30,19 @@ type Settings struct {
 	Version int `json:"version"`
 
 	// Look & Feel
-	Appearance         theme.Appearance `json:"appearance"`
-	LightCanvas        string           `json:"lightCanvas"`
-	DarkCanvas         string           `json:"darkCanvas"`
-	Accent             string           `json:"accent"`
-	Loader             string           `json:"loader"`
-	Font               string           `json:"font"`
-	TextSize           int              `json:"textSize"`
-	AnimateCharacters  bool             `json:"animateCharacters"`
-	Sounds             bool             `json:"sounds"`
-	BackgroundArtwork  bool             `json:"backgroundArtwork"`
-	TranslucentSidebar bool             `json:"translucentSidebar"`
+	Appearance        theme.Appearance `json:"appearance"`
+	LightCanvas       string           `json:"lightCanvas"`
+	DarkCanvas        string           `json:"darkCanvas"`
+	Accent            string           `json:"accent"`
+	Loader            string           `json:"loader"`
+	Font              string           `json:"font"`
+	TextSize          int              `json:"textSize"`
+	AnimateCharacters bool             `json:"animateCharacters"`
+	Sounds            bool             `json:"sounds"`
+	BackgroundArtwork bool             `json:"backgroundArtwork"`
+	// AppIcon is the colour of the marble in the app's icon.
+	AppIcon            string `json:"appIcon"`
+	TranslucentSidebar bool   `json:"translucentSidebar"`
 
 	// LinkPreviews fetches the titles of links in replies.
 	LinkPreviews bool `json:"linkPreviews"`
@@ -77,6 +80,7 @@ func Default() Settings {
 		NotifyOnFinish:    true,
 		NotifyOnApproval:  true,
 		LinkPreviews:      true,
+		AppIcon:           "Pink",
 	}
 }
 
@@ -105,6 +109,9 @@ func (s *Settings) Normalize() {
 		s.Font = d.Font
 	}
 	s.TextSize = max(0, min(s.TextSize, theme.MaxTextSize))
+	if _, ok := appicon.Colours[s.AppIcon]; !ok {
+		s.AppIcon = d.AppIcon
+	}
 	s.Version = currentVersion
 }
 

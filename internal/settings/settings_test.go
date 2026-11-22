@@ -56,13 +56,13 @@ func TestCorruptAndInvalidValues(t *testing.T) {
 		t.Fatalf("corrupt file: err=%v s=%+v", err, s)
 	}
 	odd := filepath.Join(dir, "odd.json")
-	os.WriteFile(odd, []byte(`{"appearance":"Sepia","darkCanvas":"White","accent":"Mauve","loader":"x9","font":"Comic","textSize":42,"sounds":false}`), 0o600)
+	os.WriteFile(odd, []byte(`{"appearance":"Sepia","darkCanvas":"White","accent":"Mauve","loader":"x9","font":"Comic","textSize":42,"sounds":false,"appIcon":"Plaid"}`), 0o600)
 	s, err = Load(odd)
 	if err != nil {
 		t.Fatal(err)
 	}
 	d := Default()
-	if s.Appearance != d.Appearance || s.DarkCanvas != d.DarkCanvas || s.Accent != d.Accent || s.Loader != d.Loader || s.Font != d.Font {
+	if s.Appearance != d.Appearance || s.DarkCanvas != d.DarkCanvas || s.Accent != d.Accent || s.Loader != d.Loader || s.Font != d.Font || s.AppIcon != "Pink" {
 		t.Fatalf("invalid values kept: %+v", s)
 	}
 	if s.TextSize != theme.MaxTextSize || s.Sounds {

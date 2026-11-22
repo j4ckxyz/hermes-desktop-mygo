@@ -35,6 +35,8 @@ type Native interface {
 	// (macOS vibrancy, Windows 11 Mica) or removes it. It reports a note
 	// when the change needs a restart to take full effect, else "".
 	SetSidebarMaterial(on bool) string
+	// SetAppIcon recolours the app's icon (window, taskbar, Dock).
+	SetAppIcon(colour string)
 }
 
 // UI is the window's view state.
@@ -63,6 +65,9 @@ type UI struct {
 	draft      string // the new chat's composer text
 	renaming   string
 	renameText string
+	// marbles are the icon-colour swatches, drawn in the background once.
+	marbles     map[string]*ui.Bitmap
+	marblesBusy bool
 	// materialNote says when the sidebar material needs a restart.
 	materialNote string
 	// forms holds what is typed on prompt cards, by prompt id.
@@ -104,6 +109,9 @@ func (u *UI) SetSettings(s settings.Settings) {
 	s.Normalize()
 	if s == u.Settings {
 		return
+	}
+	if s.AppIcon != u.Settings.AppIcon && u.Native != nil {
+		u.Native.SetAppIcon(s.AppIcon)
 	}
 	if s.TranslucentSidebar != u.Settings.TranslucentSidebar && u.Native != nil {
 		u.materialNote = u.Native.SetSidebarMaterial(s.TranslucentSidebar)
@@ -227,6 +235,11 @@ func (u *UI) keys(c *ui.Context) {
 	}
 	if c.Shortcut(0, ui.KeyEscape) {
 		u.Do(ActionEscape)
+	}
+	if u.Screen == ScreenMain && !u.search.open && u.Selected != "" && u.App.Conn != nil && c.Shortcut(0, ui.KeyF2) {
+		if s, ok := u.App.Conn.Session(u.Selected); ok {
+			u.renaming, u.renameText = s.ID, s.Title // F2 renames the open chat
+		}
 	}
 	if u.Screen == ScreenMain && !u.search.open {
 		for i := 1; i <= 9; i++ {

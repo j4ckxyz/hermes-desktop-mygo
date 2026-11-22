@@ -3,6 +3,8 @@ package views
 import (
 	"github.com/egoist/mygo/ui"
 
+	"hermes-desktop/internal/appicon"
+
 	"hermes-desktop/internal/settings"
 	"hermes-desktop/internal/theme"
 )
@@ -327,6 +329,10 @@ func (u *UI) lookAndFeel(c *ui.Context) {
 			u.toggleRow(c, "Show background artwork", &s.BackgroundArtwork, func(v bool) { set(func(n *settings.Settings) { n.BackgroundArtwork = v }) })
 			u.note(c, "A faint illustration behind the session list.")
 		})
+		u.card(c, "App Icon", "image", func() {
+			u.marblePicker(c, set)
+			u.note(c, "The marble in the Dock, taskbar and title bar.")
+		})
 		u.card(c, "Window", "window", func() {
 			u.toggleRow(c, "Translucent sidebar", &s.TranslucentSidebar, func(v bool) { set(func(n *settings.Settings) { n.TranslucentSidebar = v }) })
 			n := "Lets the desktop show through the sidebar on macOS and Windows 11."
@@ -520,4 +526,40 @@ func (u *UI) infoPane(c *ui.Context) {
 		"Updates":        "Hermes Desktop " + Version + ". Updates are published as releases; this build checks for none on its own.",
 	}[u.SettingsPane]
 	u.card(c, u.SettingsPane, "", func() { u.note(c, text) }).FillWidth()
+}
+
+// marblePicker offers the icon colours as small marbles, drawn once off
+// the UI thread (each is a few milliseconds of shading).
+func (u *UI) marblePicker(c *ui.Context, set func(func(*settings.Settings))) {
+	pal := &u.pal
+	if u.marbles == nil && !u.marblesBusy && u.App.Post != nil {
+		u.marblesBusy = true
+		go func() {
+			out := map[string]*ui.Bitmap{}
+			for _, n := range appicon.Names {
+				out[n] = ui.NewBitmap(appicon.Render(96, appicon.Options{Colour: n, Bare: true}))
+			}
+			u.App.Post(func() { u.marbles, u.marblesBusy = out, false })
+		}()
+	}
+	ui.Grid(c).Columns(5).Gap(14).JustifyItems(ui.Center).Children(func() {
+		for _, n := range appicon.Names {
+			sel := u.Settings.AppIcon == n
+			b := ui.Row(c).Size(52, 52).Radius(26).Justify(ui.Center).AlignItems(ui.Center).Cursor(ui.CursorPointer).
+				Focusable().Label(n + " icon").AccessSelected(sel)
+			if sel {
+				b.Shadow(0, 0, 0, 2.5, pal.Accent)
+			}
+			b.Children(func() {
+				if bm := u.marbles[n]; bm != nil {
+					ui.Image(c, bm).Size(48, 48)
+				} else {
+					ui.Box(c).Size(40, 40).Radius(20).Background(pal.Surf2)
+				}
+			})
+			if b.Clicked() || b.Shortcut(0, ui.KeySpace) {
+				set(func(s *settings.Settings) { s.AppIcon = n })
+			}
+		}
+	})
 }

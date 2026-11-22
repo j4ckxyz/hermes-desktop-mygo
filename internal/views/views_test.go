@@ -105,6 +105,7 @@ type harness struct {
 }
 
 type fakeNative struct {
+	icons    []string
 	material []bool
 	confirms []string
 	saved    map[string]string
@@ -122,7 +123,8 @@ func (f *fakeNative) SaveText(name, content string) error {
 	f.saved[name] = content
 	return nil
 }
-func (f *fakeNative) Platform() string { return "linux" }
+func (f *fakeNative) Platform() string         { return "linux" }
+func (f *fakeNative) SetAppIcon(colour string) { f.icons = append(f.icons, colour) }
 func (f *fakeNative) SetSidebarMaterial(on bool) string {
 	f.material = append(f.material, on)
 	return ""
@@ -465,7 +467,7 @@ func TestTranslucentSidebarAppliesLive(t *testing.T) {
 	h := newHarness(t, hermestest.Options{}, true)
 	h.synced()
 	h.u.Screen = ScreenSettings
-	h.tt.SetSize(1440, 1800)
+	h.tt.SetSize(1440, 2600) // the whole Look & Feel page, no scrolling
 	h.tt.Frame()
 	sw, ok := h.tt.AccessByRole(ui.RoleSwitch, "Translucent sidebar")
 	if !ok {
@@ -492,4 +494,39 @@ func TestTranslucentSidebarAppliesLive(t *testing.T) {
 	if h.u.Settings.TranslucentSidebar || len(h.fake.material) != 2 || h.fake.material[1] {
 		t.Fatalf("off again: %v", h.fake.material)
 	}
+}
+
+func TestAppIconPicker(t *testing.T) {
+	h := newHarness(t, hermestest.Options{}, true)
+	h.synced()
+	h.u.Screen = ScreenSettings
+	h.tt.SetSize(1440, 2000)
+	h.settle("marbles", func() bool { return h.u.marbles != nil })
+	sw, ok := h.tt.Access("Teal icon")
+	if !ok {
+		t.Fatal("icon swatches are labelled")
+	}
+	h.tt.ClickAt(sw.Bounds.X+sw.Bounds.W/2, sw.Bounds.Y+sw.Bounds.H/2)
+	h.tt.Frame()
+	if h.u.Settings.AppIcon != "Teal" || len(h.fake.icons) != 1 || h.fake.icons[0] != "Teal" {
+		t.Fatalf("setting %q, applied %v", h.u.Settings.AppIcon, h.fake.icons)
+	}
+}
+
+func TestF2RenamesOpenChat(t *testing.T) {
+	h := newHarness(t, hermestest.Options{}, true)
+	h.synced()
+	id := "20261122_060000_0a0b0c"
+	h.u.Select(id)
+	h.tt.Frame()
+	h.tt.Click("Hey #2") // focus the sidebar row, not the composer
+	h.tt.Key(0, ui.KeyF2)
+	h.tt.Frame()
+	if h.u.renaming != id {
+		t.Fatal("F2 starts renaming the open chat")
+	}
+	h.tt.Key(ui.Cmd, ui.KeyA)
+	h.tt.Type("Greetings")
+	h.tt.Key(0, ui.KeyEnter)
+	h.settle("renamed", func() bool { r := h.srv.SessionRow(id); return r != nil && r["title"] == "Greetings" })
 }
