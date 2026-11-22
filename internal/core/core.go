@@ -345,7 +345,10 @@ func (c *Connection) sync() bool {
 		c.setProfiles(ps)
 	})
 	// Each agent's total, for "N more sessions" before every page is in.
+	// It runs beside the paging; the sync is done once both are.
+	totalsDone := make(chan struct{})
 	go func() {
+		defer close(totalsDone)
 		totals := map[string]int{}
 		for _, p := range ps {
 			if page, err := cl.Sessions(c.ctx, hermes.SessionQuery{Profile: p.Name, Limit: 1}); err == nil {
@@ -413,6 +416,11 @@ func (c *Connection) sync() bool {
 			c.app.Cache.PutSessions(c.ctx, c.Instance.ID, all, true)
 			c.app.Cache.SetMeta(c.ctx, "fullsync:"+c.Instance.ID, c.app.Now().Format(time.RFC3339))
 		}
+	}
+	select {
+	case <-totalsDone:
+	case <-c.ctx.Done():
+		return false
 	}
 	c.post(func() {
 		if complete {
