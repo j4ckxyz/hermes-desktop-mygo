@@ -64,6 +64,21 @@ func cannotUpdate() string {
 	return "Hermes is installed where it cannot write, so it cannot update itself. Reinstall it with the install script to get updates."
 }
 
+// argFlags turns --home DIR and --debug DIR into HERMES_DESKTOP_HOME and
+// HERMES_DESKTOP_DEBUG. They are arguments too because a relaunch keeps
+// the arguments everywhere, but not the environment on macOS (it reopens
+// the app with /usr/bin/open): the update test relies on both.
+func argFlags(args []string) {
+	for i := 0; i+1 < len(args); i++ {
+		switch args[i] {
+		case "--home":
+			os.Setenv("HERMES_DESKTOP_HOME", args[i+1])
+		case "--debug":
+			os.Setenv("HERMES_DESKTOP_DEBUG", args[i+1])
+		}
+	}
+}
+
 // commandLine handles the arguments that make the app do one thing and
 // exit, without a window. It reports whether it did.
 //

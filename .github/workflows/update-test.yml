@@ -1,0 +1,53 @@
+# Checks, on a real macOS, Windows and Linux, that an installed Hermes
+# replaces itself with a newer version, and that opened on a chat it
+# offers one, updates and reopens by itself on the same chat with the
+# unsent text: tools/update-test.sh.
+name: Update test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - cmd/hermes-desktop/update.go
+      - cmd/hermes-desktop/debug.go
+      - internal/views/updates.go
+      - internal/settings/resume.go
+      - tools/update-test.sh
+      - go.mod
+      - .github/workflows/update-test.yml
+
+jobs:
+  update:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Find NSIS, which makes the Windows installer
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          if [ ! -d "/c/Program Files (x86)/NSIS" ]; then
+            choco install nsis -y --no-progress
+          fi
+          echo "C:\Program Files (x86)\NSIS" >> "$GITHUB_PATH"
+      - name: A display, for the app to open its window on
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgtk-3-0 libepoxy0 libgl1-mesa-dri libegl1 libgles2 libglx-mesa0 dbus-x11 fonts-dejavu-core
+      - name: Install an old version, publish a new one, and update
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a -s "-screen 0 1440x900x24" dbus-run-session -- tools/update-test.sh
+          else
+            tools/update-test.sh
+          fi

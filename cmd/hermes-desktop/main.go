@@ -128,6 +128,7 @@ func trace(what string) {
 }
 
 func main() {
+	argFlags(os.Args[1:])
 	start := time.Now()
 	trace("main")
 	bench := os.Getenv("HERMES_DESKTOP_BENCH")
