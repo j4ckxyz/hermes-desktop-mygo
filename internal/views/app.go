@@ -82,6 +82,13 @@ type UI struct {
 
 	connect connectForm
 
+	// Updater checks for and installs new versions (nil: none), and
+	// Relaunch saves what to reopen and restarts the app.
+	Updater      Updater
+	Relaunch     func(settings.Resume)
+	upd          updateState
+	pendingToast *ui.Toast
+
 	// SidebarShown, when set, is called once, in the frame after the first
 	// one that showed sessions (the launch benchmark's "ready" mark).
 	SidebarShown func()
@@ -147,6 +154,12 @@ func (u *UI) View(c *ui.Context) {
 		root.Background(pal.Bg)
 	}
 	root.Children(func() {
+		if u.upd.offer {
+			u.updatePage(c)
+			if u.upd.offer {
+				return
+			}
+		}
 		switch u.Screen {
 		case ScreenConnect:
 			u.connectView(c)
@@ -170,6 +183,10 @@ func (u *UI) View(c *ui.Context) {
 		c.Toast(msg)
 	}
 	u.App.Toasts = nil
+	if t := u.pendingToast; t != nil {
+		u.pendingToast = nil
+		c.AddToast(*t)
+	}
 }
 
 // ---- keyboard ----

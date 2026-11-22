@@ -47,6 +47,10 @@ type Settings struct {
 	// LinkPreviews fetches the titles of links in replies.
 	LinkPreviews bool `json:"linkPreviews"`
 
+	// AutoUpdate checks for new versions as the app opens and every few
+	// hours, and downloads the ones released while it runs.
+	AutoUpdate bool `json:"autoUpdate"`
+
 	// Notifications
 	NotifyOnFinish   bool `json:"notifyOnFinish"`
 	NotifyOnApproval bool `json:"notifyOnApproval"`
@@ -80,6 +84,7 @@ func Default() Settings {
 		NotifyOnFinish:    true,
 		NotifyOnApproval:  true,
 		LinkPreviews:      true,
+		AutoUpdate:        true,
 		AppIcon:           "Pink",
 	}
 }

@@ -137,3 +137,30 @@ func TestInstances(t *testing.T) {
 		t.Fatalf("instances.json must hold no credentials: %s", data)
 	}
 }
+
+func TestResumeIsTakenOnce(t *testing.T) {
+	path := ResumePath(filepath.Join(t.TempDir(), "settings.json"))
+	if _, ok, err := TakeResume(path); ok || err != nil {
+		t.Fatalf("no file: %v %v", ok, err)
+	}
+	want := Resume{Instance: "i1", Chat: "s1", NewProfile: "helix", NewDraft: "half a", Drafts: map[string]string{"s1": "unsent"}}
+	if err := SaveResume(path, want); err != nil {
+		t.Fatal(err)
+	}
+	got, ok, err := TakeResume(path)
+	if !ok || err != nil || got.Chat != "s1" || got.Drafts["s1"] != "unsent" || got.NewDraft != "half a" {
+		t.Fatalf("got %+v %v %v", got, ok, err)
+	}
+	if _, ok, _ := TakeResume(path); ok {
+		t.Fatal("a resume applies to one launch")
+	}
+}
+
+func TestAutoUpdateDefaultsOn(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "settings.json")
+	os.WriteFile(path, []byte(`{"version":1,"accent":"Pink"}`), 0o644)
+	s, err := Load(path)
+	if err != nil || !s.AutoUpdate {
+		t.Fatalf("an older settings file keeps updates on: %v %v", s.AutoUpdate, err)
+	}
+}

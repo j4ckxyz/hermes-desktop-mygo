@@ -131,11 +131,16 @@ func main() {
 	start := time.Now()
 	trace("main")
 	bench := os.Getenv("HERMES_DESKTOP_BENCH")
-	mygo.App.SetName("Hermes")
+	// A packaged build has mygo.json's name and version; a plain go build
+	// takes them from here.
 	if mygo.App.Version() == "" {
+		mygo.App.SetName("Hermes")
 		mygo.App.SetVersion(version)
 	}
 	views.Version = appVersion()
+	if commandLine(os.Args[1:]) {
+		return
+	}
 	loading := load()
 	fontsDone := make(chan error, 1)
 	go func() { err := theme.RegisterFonts(); trace("fonts registered"); fontsDone <- err }()
@@ -221,6 +226,23 @@ func main() {
 			app.OpenWith(open, l.preload)
 		}
 		u.SettingsChanged = saver.Request
+		// After an update's restart: the same chat, and what was typed.
+		resumePath := settings.ResumePath(l.paths.settings)
+		if r, ok, err := settings.TakeResume(resumePath); ok {
+			u.Resume(r)
+		} else if err != nil {
+			log.Printf("resume: %v", err)
+		}
+		if bench == "" && demoSetup == nil {
+			u.Updater = &mygoUpdater{}
+		}
+		u.Relaunch = func(r settings.Resume) {
+			if err := settings.SaveResume(resumePath, r); err != nil {
+				log.Printf("resume: %v", err)
+			}
+			saver.Flush()
+			mygo.App.Relaunch()
+		}
 
 		opts := mygo.WindowOptions{
 			Title:     "Hermes",
@@ -270,6 +292,8 @@ func main() {
 			demoUI(app, u)
 		}
 		installMenus(win, u)
+		debugHook(win, u)
+		win.Update(u.StartUpdates)
 		win.OnReadyToShow(func() {
 			trace("first frame")
 			if bench == "launch" {

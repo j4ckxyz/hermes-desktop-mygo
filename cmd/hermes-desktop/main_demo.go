@@ -8,6 +8,7 @@
 package main
 
 import (
+	"context"
 	"net"
 	"os"
 	"strings"
@@ -81,6 +82,14 @@ func init() {
 		case "settings":
 			u.Screen = views.ScreenSettings
 			return
+		case "update":
+			// The page of a version found at launch.
+			u.Updater = demoUpdater{next: &views.Release{Version: "0.2.0", Notes: demoNotes}}
+			return
+		case "updates":
+			u.Updater = demoUpdater{}
+			u.Screen, u.SettingsPane = views.ScreenSettings, "Updates"
+			return
 		case "new":
 			return
 		}
@@ -123,4 +132,26 @@ func init() {
 			}
 		}()
 	}
+}
+
+const demoNotes = `Faster everywhere, and a few fixes.
+
+- Chats open from the cache before the instance answers.
+- Esc closes search, settings and rename again.
+- Link previews skip private addresses.
+`
+
+// demoUpdater offers a release, or none, and installs slowly.
+type demoUpdater struct{ next *views.Release }
+
+func (demoUpdater) Unavailable() string { return "" }
+func (d demoUpdater) Check(context.Context) (*views.Release, error) {
+	return d.next, nil
+}
+func (demoUpdater) Install(ctx context.Context, r *views.Release, progress func(done, total int64)) error {
+	for i := range 100 {
+		progress(int64(i), 100)
+		time.Sleep(200 * time.Millisecond)
+	}
+	return nil
 }
