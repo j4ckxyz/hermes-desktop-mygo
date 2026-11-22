@@ -1,0 +1,16 @@
+# Legacy turn: the sequence of tests/tui_gateway/test_tui_gateway_server.py:802-805 with the tool
+# events of test_hosted_room_member_activity_hook.py:59,65, commentary and an MCP call.
+{"type":"message.start","session_id":"room-sid","payload":{}}
+{"type":"thinking.delta","session_id":"room-sid","payload":{"text":"pondering…"}}
+{"type":"message.delta","session_id":"room-sid","payload":{"text":"Let me look "}}
+{"type":"message.delta","session_id":"room-sid","payload":{"text":"at the files first."}}
+{"type":"tool.generating","session_id":"room-sid","payload":{"name":"terminal"}}
+{"type":"tool.start","session_id":"room-sid","payload":{"tool_id":"call-1","name":"terminal","args":{"command":"ls"}}}
+{"type":"tool.progress","session_id":"room-sid","payload":{"tool_id":"call-1","name":"terminal","progress":1,"message":"listing"}}
+{"type":"tool.complete","session_id":"room-sid","payload":{"tool_id":"call-1","name":"terminal","result":"ok","duration_s":0.4}}
+{"type":"tool.start","session_id":"room-sid","payload":{"tool_id":"call-2","name":"mcp__notion__API_post_search","args":{"query":"Geography"}}}
+{"type":"tool.complete","session_id":"room-sid","payload":{"tool_id":"call-2","name":"mcp__notion__API_post_search","result":{"results":[{"title":"Geography fieldwork"}]},"duration_s":1.2}}
+{"type":"message.delta","session_id":"room-sid","payload":{"text":null}}
+{"type":"message.delta","session_id":"room-sid","payload":{"text":"hi"}}
+{"type":"message.complete","session_id":"room-sid","payload":{"text":"hi","usage":{"model":"anthropic/claude-sonnet-4.6","input":900,"output":12,"total":912},"status":"complete"}}
+{"type":"session.info","session_id":"room-sid","payload":{"model":"anthropic/claude-sonnet-4.6","running":false}}

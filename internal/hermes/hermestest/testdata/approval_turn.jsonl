@@ -1,0 +1,4 @@
+# Canonical approval card: the request payload is verbatim from apps/desktop/src/api/canonical-protocol-wire.test.ts:18.
+{"type":"message.start","session_id":"s","payload":{}}
+{"type":"tool.start","session_id":"s","payload":{"tool_id":"call-9","name":"terminal","args":{"command":"rm -rf build/"}}}
+{"type":"approval.request","session_id":"s","payload":{"prompt_id":"p","execution_generation":4,"choices":["once","deny"]}}

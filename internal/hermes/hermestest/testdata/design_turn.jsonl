@@ -1,0 +1,8 @@
+# The running turn of design/Main.dc.html: three tool calls, the last still running, then thinking.
+{"type":"message.start","session_id":"s","payload":{}}
+{"type":"tool.start","session_id":"s","payload":{"tool_id":"d1","name":"tool_describe","args":{"names":["mcp__notion__API_post_search"]}}}
+{"type":"tool.complete","session_id":"s","payload":{"tool_id":"d1","name":"tool_describe","result":"ok","duration_s":0.2}}
+{"type":"tool.start","session_id":"s","payload":{"tool_id":"d2","name":"mcp__notion__API_post_search","args":{"query":"Geography"}}}
+{"type":"tool.complete","session_id":"s","payload":{"tool_id":"d2","name":"mcp__notion__API_post_search","result":"3 pages","duration_s":1.4}}
+{"type":"tool.start","session_id":"s","payload":{"tool_id":"d3","name":"terminal","args":{"command":"grep -c '^NOTION_API_KEY=' ~/.hermes/.env"}}}
+{"type":"thinking.delta","session_id":"s","payload":{"text":"Thinking"}}

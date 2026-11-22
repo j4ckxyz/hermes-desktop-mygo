@@ -1,0 +1,23 @@
+# Recorded from a live Hermes 0.23.3 instance (legacy wire), 2026-11-22, then sanitized:
+# event types, field names, order and seq are as recorded; text, ids and results are replaced.
+# session.info frames (config, cwd, system prompt) are left out.
+{"type":"message.start","session_id":"rt-live","seq":2,"payload":{"turn_id":"turn-1"}}
+{"type":"session.title","session_id":"rt-live","seq":3,"payload":{"session_id":"rt-live","title":"Live test"}}
+{"type":"thinking.delta","session_id":"rt-live","seq":4,"payload":{"text":"pondering\u2026"}}
+{"type":"session.title","session_id":"rt-live","seq":5,"payload":{"session_id":"rt-live","title":"Live test"}}
+{"type":"thinking.delta","session_id":"rt-live","seq":6,"payload":{"text":""}}
+{"type":"reasoning.delta","session_id":"rt-live","seq":7,"payload":{"text":"Run the command. "}}
+{"type":"reasoning.delta","session_id":"rt-live","seq":8,"payload":{"text":"Run the command. "}}
+{"type":"reasoning.delta","session_id":"rt-live","seq":9,"payload":{"text":"Run the command. "}}
+{"type":"reasoning.delta","session_id":"rt-live","seq":10,"payload":{"text":"Run the command. "}}
+{"type":"tool.generating","session_id":"rt-live","seq":11,"payload":{"name":"terminal"}}
+{"type":"thinking.delta","session_id":"rt-live","seq":12,"payload":{"text":"pondering\u2026"}}
+{"type":"tool.start","session_id":"rt-live","seq":13,"payload":{"tool_id":"tool-1","name":"terminal","context":"echo hermes-desktop-live-test","args":{"command":"echo hermes-desktop-live-test"}}}
+{"type":"session.usage","session_id":"rt-live","seq":14,"payload":{"usage":{"model":"model","input":1000,"output":40,"total":1040}}}
+{"type":"tool.complete","session_id":"rt-live","seq":15,"payload":{"tool_id":"tool-1","name":"terminal","args":{"command":"echo hermes-desktop-live-test"},"duration_s":0.2,"result":"{\"output\": \"hermes-desktop-live-test\\n\", \"exit_code\": 0}"}}
+{"type":"thinking.delta","session_id":"rt-live","seq":16,"payload":{"text":""}}
+{"type":"thinking.delta","session_id":"rt-live","seq":17,"payload":{"text":"pondering\u2026"}}
+{"type":"message.delta","session_id":"rt-live","seq":18,"payload":{"text":"It printed ","turn_id":"turn-1","segment":0,"offset":0}}
+{"type":"message.delta","session_id":"rt-live","seq":19,"payload":{"text":"`hermes-desktop-live-test`.","turn_id":"turn-1","segment":0,"offset":24}}
+{"type":"thinking.delta","session_id":"rt-live","seq":20,"payload":{"text":""}}
+{"type":"message.complete","session_id":"rt-live","seq":21,"payload":{"text":"It printed `hermes-desktop-live-test`.","status":"complete","reasoning":"Run the command.","persisted_turn":true,"usage":{"model":"model","input":1000,"output":40,"total":1040}}}
