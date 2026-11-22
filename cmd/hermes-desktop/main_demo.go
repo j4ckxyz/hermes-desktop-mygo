@@ -94,7 +94,9 @@ func init() {
 			return
 		}
 		u.Select(demoSession)
-		if screen == "main-expanded" {
+		// main-scrolled: the tool groups open make the chat long, and it
+		// stays at its end, with text scrolled under the header.
+		if screen == "main-expanded" || screen == "main-scrolled" {
 			go func() {
 				for range 100 {
 					time.Sleep(50 * time.Millisecond)
@@ -104,7 +106,9 @@ func init() {
 						ok := ch != nil && ch.Fetched
 						if ok {
 							u.ExpandToolGroups()
-							u.ScrollChatToTop()
+							if screen == "main-expanded" {
+								u.ScrollChatToTop()
+							}
 						}
 						done <- ok
 					})

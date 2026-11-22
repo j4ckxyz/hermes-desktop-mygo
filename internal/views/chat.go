@@ -192,38 +192,47 @@ func (u *UI) chatView(c *ui.Context, conn *core.Connection, ch *core.Chat) {
 	ls.Key = func(i int) any { return rows[i].key() }
 	ls.FollowEnd = true
 	ls.FollowAnimation = &ui.Smooth
-	list := ui.List(c, ls, len(rows), func(i int) {
-		r := rows[i]
-		ui.Column(c).FillWidth().AlignItems(ui.Center).Padding(r.top, 0, 0, 0).Children(func() {
-			ui.Column(c).FillWidth().MaxWidth(contentWidth).Children(func() { u.chatRow(c, conn, ch, r) })
-		})
-	}).Grow(1).Padding(18, 24, 24, 24).Label("Conversation")
-	switch {
-	case !ch.Loaded && ch.Err == nil:
-		list.Children(func() {
-			ui.Row(c).Margin(ui.Auto).Gap(10).AlignItems(ui.Center).Children(func() {
-				Loader(c, u.Settings.Loader, pal, true)
-				ui.Text(c, "Loading the chat…").TextColor(pal.Muted)
+	// The transcript scrolls under a soft fade, so text leaving at the top
+	// melts away beneath the floating header pill instead of being cut.
+	ui.Column(c).Grow(1).MinHeight(0).FillWidth().Children(func() {
+		list := ui.List(c, ls, len(rows), func(i int) {
+			r := rows[i]
+			ui.Column(c).FillWidth().AlignItems(ui.Center).Padding(r.top, 0, 0, 0).Children(func() {
+				ui.Column(c).FillWidth().MaxWidth(contentWidth).Children(func() { u.chatRow(c, conn, ch, r) })
 			})
-		})
-	case ch.Err != nil && len(rows) == 0:
-		list.Children(func() {
-			ui.Column(c).Margin(ui.Auto).Gap(8).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, "Could not load this chat").FontSize(16).FontWeight(700)
-				ui.Text(c, ch.Err.Error()).TextColor(pal.Muted).MaxWidth(460).TextAlign(ui.Center)
-				if PillButton(c, pal, "Try again").Clicked() {
-					ch.Err = nil
-					conn.OpenChat(ch.ID)
-				}
+		}).Grow(1).Padding(18, 24, 24, 24).Label("Conversation")
+		switch {
+		case !ch.Loaded && ch.Err == nil:
+			list.Children(func() {
+				ui.Row(c).Margin(ui.Auto).Gap(10).AlignItems(ui.Center).Children(func() {
+					Loader(c, u.Settings.Loader, pal, true)
+					ui.Text(c, "Loading the chat…").TextColor(pal.Muted)
+				})
 			})
-		})
-	case len(rows) == 0:
-		list.Children(func() {
-			ui.Text(c, "No messages yet.").TextColor(pal.Muted).Margin(ui.Auto)
-		})
-	}
+		case ch.Err != nil && len(rows) == 0:
+			list.Children(func() {
+				ui.Column(c).Margin(ui.Auto).Gap(8).AlignItems(ui.Center).Children(func() {
+					ui.Text(c, "Could not load this chat").FontSize(16).FontWeight(700)
+					ui.Text(c, ch.Err.Error()).TextColor(pal.Muted).MaxWidth(460).TextAlign(ui.Center)
+					if PillButton(c, pal, "Try again").Clicked() {
+						ch.Err = nil
+						conn.OpenChat(ch.ID)
+					}
+				})
+			})
+		case len(rows) == 0:
+			list.Children(func() {
+				ui.Text(c, "No messages yet.").TextColor(pal.Muted).Margin(ui.Auto)
+			})
+		}
+		ui.Box(c).Absolute().Top(0).Left(0).Right(14).Height(headerFade).ZIndex(1).PassThrough().AccessHidden(true).
+			LinearGradient(ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{gs(pal.Bg, 0), gs(pal.Bg, 0.15), gs(pal.Bg.Alpha(0), 1)}})
+	})
 	u.composer(c, conn, ch.ID, ch.Profile, &ch.Draft, ch.Running(), prof)
 }
+
+// headerFade is the height of the fade under the chat header.
+const headerFade = 40
 
 func (u *UI) chatHeader(c *ui.Context, conn *core.Connection, ch *core.Chat, s hermes.Session, prof hermes.Profile) {
 	pal := &u.pal
