@@ -706,3 +706,36 @@ func TestSignedOutBanner(t *testing.T) {
 		t.Fatal("the banner opens the sign-in for that instance")
 	}
 }
+
+func TestPlainHTTPWarning(t *testing.T) {
+	h := newHarness(t, hermestest.Options{Token: "good-token"}, false)
+	h.tt.Frame()
+	for addr, warn := range map[string]bool{"http://192.168.1.5:9119": true, "http://127.0.0.1:9119": false, "localhost:9119": false, "hermes.example.com": false, "https://h.example": false, "http://h.example": true} {
+		if insecureAddress(addr) != warn {
+			t.Errorf("insecureAddress(%q) = %v", addr, !warn)
+		}
+	}
+	// The fake listens on 127.0.0.1, so ask about it as if it were remote:
+	// a refused confirmation sends nothing.
+	h.fake.answer = false
+	h.u.connect.address = "http://192.168.1.5:9119"
+	h.u.connect.token = "good-token"
+	h.tt.Frame()
+	if !h.tt.HasText("This address is not encrypted (http://). Your key or password would cross the network in the clear: use https:// unless the network itself is private, such as Tailscale.") {
+		t.Fatal("the inline warning")
+	}
+	h.tt.Click("Connect")
+	h.tt.Frame()
+	if len(h.fake.confirms) != 1 || h.u.connect.busy {
+		t.Fatalf("asks first, and stops when refused: %v busy=%v", h.fake.confirms, h.u.connect.busy)
+	}
+	// Loopback http is not asked about.
+	h.fake.answer = true
+	h.u.connect.address = h.srv.URL
+	h.tt.Frame() // the warning goes, and the button moves up
+	h.tt.Click("Connect")
+	h.settle("connected", func() bool { return h.u.Screen == ScreenMain })
+	if len(h.fake.confirms) != 1 {
+		t.Fatal("no question for this machine")
+	}
+}

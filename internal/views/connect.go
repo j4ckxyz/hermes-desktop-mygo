@@ -1,6 +1,8 @@
 package views
 
 import (
+	"strings"
+
 	"github.com/egoist/mygo/ui"
 
 	"hermes-desktop/internal/core"
@@ -149,6 +151,13 @@ func (u *UI) connectCard(c *ui.Context) {
 			}
 			in := u.field(c, &f.address, "Address", ph, false)
 			in.Submitted()
+			if insecureAddress(f.address) {
+				ui.Row(c).Gap(8).AlignItems(ui.Start).Children(func() {
+					Icon(c, "warn", 16, ui.Hex("#E8B04A"))
+					ui.Text(c, "This address is not encrypted (http://). Your key or password would cross the network in the clear: use https:// unless the network itself is private, such as Tailscale.").
+						FontSize(13).TextColor(pal.Muted).Grow(1)
+				})
+			}
 		})
 		// Sign-in method.
 		ui.Row(c).Gap(8).Role(ui.RoleTabList).Label("Sign-in method").Children(func() {
@@ -272,6 +281,13 @@ func (u *UI) submitConnect() {
 			return
 		}
 	}
+	if insecureAddress(f.address) && u.Native != nil &&
+		!u.Native.Confirm("Sign in over an unencrypted connection?",
+			"The address starts with http://, so your API key or password would be sent in the clear to "+f.address+". Use https:// if you can (Tailscale Serve, or a reverse proxy). Over a private network you trust, such as Tailscale, this is safe.",
+			"Sign in anyway") {
+		f.busy = false
+		return
+	}
 	u.App.Connect(req, func(inst settings.Instance, err error) {
 		f.busy = false
 		if err != nil {
@@ -329,4 +345,14 @@ func (u *UI) savedInstances(c *ui.Context) {
 			})
 		}
 	})
+}
+
+// insecureAddress reports whether an address typed on the connect screen
+// is plain http to another machine.
+func insecureAddress(addr string) bool {
+	if strings.TrimSpace(addr) == "" {
+		return false
+	}
+	u, err := hermes.NormalizeURL(addr)
+	return err == nil && hermes.Insecure(u)
 }

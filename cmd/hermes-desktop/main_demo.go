@@ -72,7 +72,11 @@ func init() {
 		switch screen {
 		case "connect", "connect-dashboard":
 			u.Screen = views.ScreenConnect
-			u.PrefillConnect(true, screen == "connect-dashboard", "https://hermes-vps.your-tailnet.ts.net")
+			addr := "https://hermes-vps.your-tailnet.ts.net"
+			if os.Getenv("HERMES_DEMO_HTTP") != "" {
+				addr = "http://192.168.1.20:9119"
+			}
+			u.PrefillConnect(true, screen == "connect-dashboard", addr)
 			return
 		case "settings":
 			u.Screen = views.ScreenSettings
