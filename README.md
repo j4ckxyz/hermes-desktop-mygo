@@ -104,6 +104,9 @@ Instances** signs one in again or removes it.
   copy its ID or its `hermes --resume` command, export as Markdown, delete),
   a message (copy), a tool call (copy the command or its result), a link.
 - **Share** exports the open chat as Markdown.
+- **Menus.** On macOS they are in the menu bar at the top of the screen. On
+  Windows and Linux the app draws its own title bar, as on macOS, so its
+  menus stay out of sight until you press **Alt** or **F10**.
 - **Search** (**Ctrl/⌘+K**) finds chats by title at once, and by their text
   on your instance a moment later.
 - **Notifications.** With the window in the background, the app tells you
@@ -121,6 +124,7 @@ Instances** signs one in again or removes it.
 | Esc | Stop the agent (or close search, or leave settings) |
 | Enter / Shift+Enter | Send / new line |
 | ⌘⇧E | Export the chat as Markdown |
+| Alt or F10 (Windows, Linux) | Open the menus (File, Edit, Chat, View, Help) |
 | F2 | Rename (from a chat's menu) |
 
 ## Settings

@@ -2,6 +2,7 @@ package theme
 
 import (
 	"embed"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -24,22 +25,24 @@ func RegisterFonts() error {
 			registerErr = err
 			return
 		}
+		// Each face on its own: one that fails leaves the others in use.
+		var errs []error
 		for _, e := range entries {
 			name := e.Name()
 			data, err := fontFiles.ReadFile("fonts/" + name)
 			if err != nil {
-				registerErr = err
-				return
+				errs = append(errs, err)
+				continue
 			}
 			family := "Nunito"
 			if strings.HasPrefix(name, "JetBrainsMono") {
 				family = "JetBrains Mono"
 			}
 			if err := ui.RegisterFont(data, family); err != nil {
-				registerErr = fmt.Errorf("register %s: %w", name, err)
-				return
+				errs = append(errs, fmt.Errorf("register %s: %w", name, err))
 			}
 		}
+		registerErr = errors.Join(errs...)
 	})
 	return registerErr
 }

@@ -530,3 +530,25 @@ func TestF2RenamesOpenChat(t *testing.T) {
 	h.tt.Key(0, ui.KeyEnter)
 	h.settle("renamed", func() bool { r := h.srv.SessionRow(id); return r != nil && r["title"] == "Greetings" })
 }
+
+// With a hidden title bar the header is the title bar: its buttons keep
+// clear of the system's window buttons.
+func TestHeaderClearsWindowButtons(t *testing.T) {
+	h := newHarness(t, hermestest.Options{}, true)
+	h.synced()
+	h.tt.SetTitleBar(ui.TitleBar{Height: 40, Right: 130, Bottom: 40})
+	h.u.Select("20261122_060000_0a0b0c")
+	h.settle("chat", func() bool { return h.tt.HasText("Hey! What can I help with?") })
+	more, ok := h.tt.Access("More")
+	if !ok {
+		t.Fatal("the More button is labelled")
+	}
+	if right := more.Bounds.X + more.Bounds.W; right > 1440-130 {
+		t.Fatalf("More ends at %v, under the window buttons (from %v)", right, 1440-130)
+	}
+	h.u.Screen = ScreenSettings
+	h.tt.Frame()
+	if !h.tt.HasText("Settings") {
+		t.Fatal("settings title bar")
+	}
+}

@@ -26,7 +26,8 @@ var settingsPanes = []struct{ name, icon string }{
 func (u *UI) settingsView(c *ui.Context) {
 	pal := &u.pal
 	ui.Column(c).Fill().Background(pal.Bg).Children(func() {
-		ui.Row(c).Height(56).FillWidth().Padding(0, 22).AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(pal.Line).DragWindow().Children(func() {
+		bar := c.TitleBar()
+		ui.Row(c).Height(max(56, bar.Height)).FillWidth().Padding(0, max(22, bar.Right+12), 0, max(22, bar.Left+12)).AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(pal.Line).DragWindow().Children(func() {
 			ui.Text(c, "Settings").FontSize(14).FontWeight(700).TextColor(pal.Muted).Grow(1).TextAlign(ui.Center)
 		})
 		ui.Row(c).Grow(1).FillWidth().AlignItems(ui.Stretch).Children(func() {
@@ -515,6 +516,9 @@ func (u *UI) generalPane(c *ui.Context) {
 			u.SetSettings(n)
 		})
 		u.note(c, "Link cards in replies show the page's title, fetched once, without cookies.")
+		if u.Native != nil && u.Native.Platform() != "darwin" {
+			u.note(c, "Menus: press Alt or F10 to open File, Edit, Chat, View and Help.")
+		}
 		u.note(c, "Keyboard: ⌘/Ctrl+1–9 jumps to the chats in the sidebar (hold the key to see their numbers), ⌘/Ctrl+N starts a chat, ⌘/Ctrl+K searches, ⌘/Ctrl+, opens settings and Esc stops a running agent.")
 	}).FillWidth()
 }

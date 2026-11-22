@@ -204,6 +204,12 @@ func main() {
 			if s.TranslucentSidebar {
 				opts.Vibrancy = mygo.VibrancySidebar
 			}
+		} else {
+			// The app draws its own title bar, as the design does, with the
+			// system's window buttons in it. The menu bar stays a real one
+			// but hides: Alt or F10 opens it (Linux), or its menus in a popup
+			// (Windows), and its shortcuts work all along.
+			opts.TitleBarStyle = mygo.TitleBarHidden
 		}
 		// Windows shows a material only in a window created with one, and
 		// such a window has no menu bar (Alt or F10 opens the menus): so

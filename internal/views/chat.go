@@ -230,7 +230,10 @@ func (u *UI) chatView(c *ui.Context, conn *core.Connection, ch *core.Chat) {
 
 func (u *UI) chatHeader(c *ui.Context, conn *core.Connection, ch *core.Chat, s hermes.Session, prof hermes.Profile) {
 	pal := &u.pal
-	ui.Grid(c).ColumnTracks(ui.Fr(1), ui.FitContent(), ui.Fr(1)).AlignItems(ui.Center).Padding(14, 20, 6, 20).DragWindow().Children(func() {
+	// The header is the window's title bar: it drags the window and keeps
+	// clear of the system's window buttons (top right on Linux and Windows).
+	bar := c.TitleBar()
+	ui.Grid(c).ColumnTracks(ui.Fr(1), ui.FitContent(), ui.Fr(1)).AlignItems(ui.Center).Padding(14, max(20, bar.Right+12), 6, 20).DragWindow().Children(func() {
 		ui.Box(c)
 		pill := ui.Row(c).Gap(10).Padding(7, 18, 7, 8).Radius(999).Background(pal.Surf).Border(1, pal.Line).
 			Shadow(0, 8, 24, 0, ui.RGBA(0, 0, 0, 0.25)).AlignItems(ui.Center).MaxWidth(520).MinWidth(0)

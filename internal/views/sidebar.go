@@ -215,7 +215,10 @@ func (u *UI) sidebarView(c *ui.Context, conn *core.Connection) {
 	}
 	side.Children(func() {
 		// Title row: room for the traffic lights on macOS, then the buttons.
-		top := ui.Row(c).Height(44).Padding(0, 4).AlignItems(ui.Center).DragWindow()
+		// Room for window buttons on the left (macOS's traffic lights, or a
+		// Linux desktop that puts them there); the row drags the window.
+		bar := c.TitleBar()
+		top := ui.Row(c).Height(max(44, bar.Bottom-14+8)).Padding(0, 4, 0, max(4, bar.Left-14)).AlignItems(ui.Center).DragWindow()
 		top.Children(func() {
 			ui.Spacer(c)
 			ui.Row(c).Gap(8).Children(func() {

@@ -39,7 +39,7 @@ Full-size: `screenshots/before/`, `screenshots/after/` (and
 
 | Difference | Why |
 |---|---|
-| A menu bar on Linux (and Windows) where the design shows macOS traffic lights | The brief asks for real window menus on Windows and Linux; macOS gets the hidden title bar with the traffic lights over the sidebar |
+| The system's window buttons (top right on Linux and Windows) where the design shows macOS traffic lights | Each platform keeps its own controls. Since the follow-up, Linux and Windows also draw their own title bar as the design does: the menu bar is hidden and opens with Alt or F10 |
 | The chat opens at its newest turn; the design shows the page scrolled to the top | A chat must show its latest message; the design is a static page (its own last row sits half under the composer) |
 | "127.0.0.1 · connected" for "hermes-vps · connected", times such as "now"/"0:04" for "4d"/"5:46", 18 tool pills in the expanded group for 4, row order of two running chats | Demo data from the fake instance, not the UI |
 | "Rounded · Default" for "SF Rounded · Default" | SF Rounded exists only on macOS, where the label says so; elsewhere the bundled Nunito is used |
