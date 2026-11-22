@@ -404,3 +404,16 @@ Location: a scratch directory (not in the repo) (`main.go`, `main_test.go`, `go.
 - It opens a window with a purple rounded card (`Radius`, `Shadow`, `RadialGradient` highlight), title and status text, and a breathing orb drawn paint-only (`Draw` + `p.Now()` + `p.AnimationFrameRate(30)`). Cmd/Ctrl+K toggles a search input, Esc closes it, Cmd/Ctrl+1–9 selects. Holding Cmd/Ctrl alone for 300 ms shows number badges (`holdTracker`, driven by `c.Modifiers()`, `c.KeysDown()`, `c.After()` and `c.WindowActive()`). A goroutine posts state back via `win.Update`.
 - Tests: a pure `holdTracker` test, plus a headless `ui.NewTester` test using `HoldModifiers(ui.Cmd)`, `Advance(…)`, `SetFocused(false)` and `Key(ui.Cmd, ui.KeyK)`.
 - **Build status:** built and run (Go 1.27.4, Xvfb + llvmpipe); its patterns (holdTracker, paint-only animation, Window.Update) live on in internal/views.
+
+---
+
+## Learned while building (v0.10.0)
+
+- **`TextArea` has a default `MinHeight(Space(20))`** (80 px): `Lines(1, 8)` alone still gives three lines' height; add `MinHeight(0)` for a one-line composer.
+- **`Element.Selected(true)` styles the element** (accent fill, `AccentText` text). For custom controls that only need to report selection, use `AccessSelected`.
+- **A hidden `List` builds no rows**, so hiding a list does not keep its rows' text layouts; the shared text layout cache (8 MB) does that instead. Keep one `ListState` per chat so switching back neither re-measures nor loses the scroll position.
+- **`ui.Icon` tints the whole SVG with the text colour**, overriding its own fills; colour icons with `TextColor`.
+- **`ui.Tester.Frame()` runs frames until the view settles**: with paint-only animations running it times several frames. Benchmarks set `Preferences{ReduceMotion: true}`.
+- **Windows materials:** `Window.SetVibrancy` changes the material only of a window created with one, and such a window has no menu bar (Alt/F10 open the menus). macOS changes vibrancy at any time.
+- **The Markdown theme has no padding or radius for inline code spans**, only a background.
+- **`ListState.HoldPlace()`** keeps a following list where it is for a frame, so a fold opening near the end does not scroll away.

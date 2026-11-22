@@ -914,7 +914,7 @@ I found no rate limit on `/api/ws` or `/api/*` REST beyond these.
 
 ## 9. Unconfirmed / open questions
 
-1. **Headless native password flow (§2.3.2).** The server code supports `/auth/native/authorize?provider=basic` followed by `/auth/password-login` returning a loopback `next` with a code. apps/desktop does not use it, and its comments say the opposite (`apps/desktop/electron/native-auth-decisions.ts:219-221`). Needs a live test.
+1. ~~**Headless native password flow (§2.3.2).**~~ **Confirmed live** (0.23.3): authorize → password login → `/auth/native/token` returns an access and a refresh token; Hermes Desktop uses it for Dashboard login.
 2. **Bearer logout.** `/auth/logout` revokes only cookie-borne tokens. Is there a supported revoke for native bearer tokens? None was found.
 3. **First attach mid-turn on the canonical wire.** The snapshot has no `inflight` field. Is replay from `last_seen:0` the intended way to rebuild a partially streamed reply?
 4. **Standalone `hermes dashboard` / `hermes serve` speak only the legacy wire.** Confirm that remote instances in practice are gateway-served (canonical), or that the legacy wire must be fully supported.
@@ -941,3 +941,23 @@ Tested against a remote instance reporting `version 0.23.3` (behind HTTPS on a t
   - `Authorization: Bearer <key>` → 401 `{"error":"session_expired","reason":"invalid_or_expired_session"}`.
   - At tag `v0.23.3` the provider exists (`plugins/dashboard_auth/session_token/__init__.py`) but registers only when `HERMES_DASHBOARD_SESSION_TOKEN` is set in the server's environment. The connect screen now detects `auth_required` without `session-token` and says so, pointing to Dashboard login.
 - **`/v1/*` and `/health` are not served by the dashboard listener** (302 to `/login?next=…`); the API server (`:8642`) was not reachable on the same host. A 64-character `API_SERVER_KEY` therefore has nowhere to go at that address.
+
+### 10.1 More live findings
+
+- **The instance speaks the legacy wire** (`gateway.ready` without `session_authority`). Its stream for a command tool call is, in order: `message.start`, `session.title`, `thinking.delta`, `reasoning.delta`…, `tool.generating`, `tool.start`, `session.usage`, `tool.complete`, `message.delta`…, `message.complete` (`internal/hermes/hermestest/testdata/live_legacy_0233.jsonl`, sanitized).
+- **`compacted` comes as `0`/`1`**, not a boolean, in `/api/sessions/{id}/messages`; the client accepts either (`hermes.Flag`).
+- **8,835 sessions**: a 500-row page of `/api/profiles/sessions` takes 2–3 s, so the app shows a 200-row first page at once, pages the rest in the background, and on later launches stops at the first page with nothing new (a full pass, which also finds deletions, once a day).
+- **The runtime id matters on the legacy wire.** `prompt.submit` must name the id `session.resume` returned; the app resumes a chat before its first submit when the chat's own resume has not finished.
+
+### 10.2 Server requests the app answers
+
+| Request | Card | Answer |
+|---|---|---|
+| `approval` (legacy) | the command, the choices | `{choice}` |
+| `sudo` | the command, a masked password field | `{value}` (`""` = skipped) |
+| `secret` | the variable and the agent's prompt, a masked field | `{value}` (`""` = skipped) |
+| `clarify` (batch) | each question: choice chips (single or multi) or a text field | `{answers: {qid: str|null}, outcome: "submitted"}`; Skip sends `{outcome: "cancelled"}` (no answers = cancel all) |
+| `request.cancel` event | the card goes | n/a |
+| anything else (`preview.*`, `vault.*`, …) | none | `-32601` |
+
+Passwords and secrets go from the card's field straight to the socket; the form is wiped once sent and nothing is stored or logged.

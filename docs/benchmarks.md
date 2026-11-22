@@ -55,3 +55,15 @@ p95 (347 ms) is a single slow outlier of 15 on a shared machine.
   sidebar went from 309 ms to 227 ms (p50).
 - Per-chat `ui.ListState`: switching back to a chat neither re-measures its
   rows nor loses its place.
+
+## CI launch smoke test
+
+The workflow launches the demo build on each runner and waits for its first
+frame (`HERMES_DESKTOP_BENCH=launch`). Times are the app's own, from process
+start, on cold, shared virtual machines (one run, not a benchmark):
+
+| Runner | First frame |
+|---|---|
+| macOS (`macos-latest`) | 356 ms |
+| Windows (`windows-latest`) | 438 ms |
+| Linux (`ubuntu-latest`, `xvfb-run`, software GL) | 3.4 s |

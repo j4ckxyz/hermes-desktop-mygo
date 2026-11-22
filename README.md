@@ -39,4 +39,4 @@ Live end-to-end test against your own instance: put `HERMES_URL` and either
 | `internal/cache` | SQLite cache (pure Go) |
 | `internal/secrets` | OS keychain |
 | `internal/theme`, `internal/settings` | design tokens, persisted Look & Feel |
-| `docs/` | API and MyGo research, benchmarks |
+| `docs/` | API and MyGo research, benchmarks, the design comparison (`design-comparison.md`) |
