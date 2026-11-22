@@ -196,3 +196,74 @@ func BenchmarkColdRead(b *testing.B) {
 		c.Close()
 	}
 }
+
+func TestPruneKeepsTheMostRecentlyOpened(t *testing.T) {
+	c, _ := openTemp(t)
+	ctx := context.Background()
+	t0 := time.Unix(1_800_000_000, 0)
+	msgs := []hermes.Message{{Role: "user", Content: json.RawMessage(`"hi"`)}}
+	for i := range 10 {
+		inst := "a"
+		if i%2 == 1 {
+			inst = "b" // across instances
+		}
+		if err := c.PutTranscript(ctx, inst, fmt.Sprint("s", i), msgs, t0.Add(time.Duration(i)*time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// s0, fetched first, was opened last (from the cache, offline).
+	if err := c.OpenedTranscript(ctx, "a", "s0", t0.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	n, err := c.PruneTranscripts(ctx, 4)
+	if err != nil || n != 6 {
+		t.Fatalf("removed %d, %v", n, err)
+	}
+	keep := map[string]bool{}
+	for i := range 10 {
+		inst := map[bool]string{true: "b", false: "a"}[i%2 == 1]
+		if _, _, ok, _ := c.Transcript(ctx, inst, fmt.Sprint("s", i)); ok {
+			keep[fmt.Sprint("s", i)] = true
+		}
+	}
+	if len(keep) != 4 || !keep["s0"] || !keep["s9"] || !keep["s8"] || !keep["s7"] {
+		t.Fatalf("kept %v", keep)
+	}
+	if n, _ := c.CountTranscripts(ctx); n != 4 {
+		t.Fatalf("count %d", n)
+	}
+}
+
+func TestSchemaOneIsUpgradedInPlace(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "cache.db")
+	c, err := Open(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	// Make it a version 1 file: no opened_at, schema 1, one transcript.
+	for _, q := range []string{
+		`DROP TABLE transcripts`,
+		`CREATE TABLE transcripts (instance TEXT NOT NULL, session TEXT NOT NULL, fetched_at REAL NOT NULL, data BLOB NOT NULL, PRIMARY KEY (instance, session))`,
+		`INSERT INTO transcripts VALUES ('a','s1',1800000000,'[]')`,
+		`UPDATE meta SET value='1' WHERE key='schema'`,
+	} {
+		if _, err := c.db.ExecContext(ctx, q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	c.Close()
+	c, err = Open(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if _, _, ok, _ := c.Transcript(ctx, "a", "s1"); !ok {
+		t.Fatal("the upgrade keeps what was cached")
+	}
+	var opened float64
+	c.db.QueryRowContext(ctx, `SELECT opened_at FROM transcripts`).Scan(&opened)
+	if opened != 1800000000 {
+		t.Fatalf("opened_at starts as fetched_at, got %v", opened)
+	}
+}

@@ -11,6 +11,7 @@ package core
 import (
 	"context"
 	"errors"
+	"log"
 	"sort"
 	"strings"
 	"sync"
@@ -482,8 +483,17 @@ func (c *Connection) sync() bool {
 		}
 		c.Synced, c.Paging = true, false
 	})
+	if c.app.Cache != nil {
+		if _, err := c.app.Cache.PruneTranscripts(c.ctx, KeepTranscripts); err != nil && c.ctx.Err() == nil {
+			log.Printf("cache: pruning transcripts: %v", err)
+		}
+	}
 	return true
 }
+
+// KeepTranscripts is how many transcripts the cache keeps after a sync:
+// the most recently opened, of every instance.
+var KeepTranscripts = 300
 
 // mergeSessions adds or updates sessions, keeping the list sorted.
 func (c *Connection) mergeSessions(ss []hermes.Session) {
@@ -576,6 +586,9 @@ func (c *Connection) OpenChat(id string) *Chat {
 }
 
 func (c *Connection) loadChat(id, profile string, inMemory bool) {
+	if c.app.Cache != nil {
+		c.app.Cache.OpenedTranscript(c.ctx, c.Instance.ID, id, c.app.Now())
+	}
 	if !inMemory && c.app.Cache != nil {
 		if msgs, _, ok, _ := c.app.Cache.Transcript(c.ctx, c.Instance.ID, id); ok {
 			turns := transcript.FromMessages(msgs)

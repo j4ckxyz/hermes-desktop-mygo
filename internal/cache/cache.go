@@ -22,7 +22,15 @@ import (
 )
 
 // schemaVersion bumps when the tables change; an older file is rebuilt.
-const schemaVersion = 1
+const schemaVersion = 2
+
+// upgrades bring a file of an older schema up to date in place; a file
+// whose version has none here is rebuilt.
+var upgrades = map[int]string{
+	// 1 → 2: when each transcript was last opened, for pruning.
+	1: `ALTER TABLE transcripts ADD COLUMN opened_at REAL NOT NULL DEFAULT 0;
+	    UPDATE transcripts SET opened_at = fetched_at;`,
+}
 
 const schema = `
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -38,6 +46,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE INDEX IF NOT EXISTS sessions_recent ON sessions (instance, last_active DESC);
 CREATE TABLE IF NOT EXISTS transcripts (
 	instance TEXT NOT NULL, session TEXT NOT NULL, fetched_at REAL NOT NULL, data BLOB NOT NULL,
+	opened_at REAL NOT NULL DEFAULT 0,
 	PRIMARY KEY (instance, session)
 );
 `
@@ -101,6 +110,12 @@ func (c *Cache) migrate() error {
 	err := c.db.QueryRowContext(ctx, `SELECT CAST(value AS INTEGER) FROM meta WHERE key='schema'`).Scan(&v)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
+	}
+	for v != 0 && v < schemaVersion && upgrades[v] != "" {
+		if _, err := c.db.ExecContext(ctx, upgrades[v]); err != nil {
+			return err
+		}
+		v++
 	}
 	if v != 0 && v != schemaVersion {
 		for _, t := range []string{"profiles", "sessions", "transcripts"} {
@@ -259,17 +274,47 @@ func (c *Cache) Transcript(ctx context.Context, instance, session string) (msgs 
 	return msgs, hermes.UnixTime(at).Time, true, nil
 }
 
-// PutTranscript stores a session's transcript.
+// PutTranscript stores a session's transcript, fetched as it was opened.
 func (c *Cache) PutTranscript(ctx context.Context, instance, session string, msgs []hermes.Message, fetched time.Time) error {
 	data, err := json.Marshal(msgs)
 	if err != nil {
 		return err
 	}
-	_, err = c.db.ExecContext(ctx, `INSERT INTO transcripts(instance,session,fetched_at,data) VALUES(?,?,?,?)
-		ON CONFLICT(instance,session) DO UPDATE SET fetched_at=excluded.fetched_at, data=excluded.data`,
-		instance, session, float64(fetched.UnixNano())/1e9, data)
+	at := unix(fetched)
+	_, err = c.db.ExecContext(ctx, `INSERT INTO transcripts(instance,session,fetched_at,data,opened_at) VALUES(?,?,?,?,?)
+		ON CONFLICT(instance,session) DO UPDATE SET fetched_at=excluded.fetched_at, data=excluded.data,
+			opened_at=max(opened_at, excluded.opened_at)`,
+		instance, session, at, data, at)
 	return err
 }
+
+// OpenedTranscript records that a session was opened at, which keeps its
+// transcript among those PruneTranscripts keeps.
+func (c *Cache) OpenedTranscript(ctx context.Context, instance, session string, at time.Time) error {
+	_, err := c.db.ExecContext(ctx, `UPDATE transcripts SET opened_at=max(opened_at, ?) WHERE instance=? AND session=?`, unix(at), instance, session)
+	return err
+}
+
+// PruneTranscripts keeps the keep most recently opened transcripts, of
+// every instance, and removes the rest. It returns how many it removed.
+func (c *Cache) PruneTranscripts(ctx context.Context, keep int) (int, error) {
+	res, err := c.db.ExecContext(ctx, `DELETE FROM transcripts WHERE rowid NOT IN
+		(SELECT rowid FROM transcripts ORDER BY opened_at DESC, fetched_at DESC LIMIT ?)`, keep)
+	if err != nil {
+		return 0, err
+	}
+	n, err := res.RowsAffected()
+	return int(n), err
+}
+
+// CountTranscripts is how many transcripts are cached.
+func (c *Cache) CountTranscripts(ctx context.Context) (int, error) {
+	var n int
+	err := c.db.QueryRowContext(ctx, `SELECT count(*) FROM transcripts`).Scan(&n)
+	return n, err
+}
+
+func unix(t time.Time) float64 { return float64(t.UnixNano()) / 1e9 }
 
 // ForgetInstance removes everything cached for an instance.
 func (c *Cache) ForgetInstance(ctx context.Context, instance string) error {

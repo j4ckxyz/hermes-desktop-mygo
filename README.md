@@ -225,10 +225,18 @@ Other pages: **General** (link previews, the shortcuts), **Instances**,
 |---|---|
 | Passwords, API keys, sign-in tokens | The system keychain only |
 | Settings (`settings.json`) and saved instances (`instances.json`, addresses only) | `~/.config/Hermes Desktop` (Linux), `~/Library/Application Support/Hermes Desktop` (macOS), `%AppData%\Hermes Desktop` (Windows) |
-| A cache of your agents, chats and transcripts (`cache.db`, SQLite) | The system cache folder, `Hermes Desktop` |
+| A cache of your agents, chats and the 300 transcripts you opened most recently (`cache.db`, SQLite) | The system cache folder, `Hermes Desktop` |
 
-The cache only makes the app fast; deleting it loses nothing your instance
-does not have. Link cards fetch the title of the page they point to, once,
+The cache only makes the app fast. Deleting it loses nothing your instance
+doesn't also have.
+
+**The cache holds the text of your chats unencrypted.** It's readable by
+your user account and by anyone who can read your files: what you sent,
+the agents' replies, and their tool output. It keeps the 300 transcripts
+you opened most recently and removes the rest after each sync. To clear it,
+remove the instance in **Settings → Instances**, which deletes its cache, or
+delete `cache.db` while the app is closed. Use full-disk encryption
+(FileVault, BitLocker, LUKS) if that matters on your machine. Link cards fetch the title of the page they point to, once,
 without cookies, and only from public addresses: never your own machine or
 network (loopback, private, link-local and CGNAT ranges, checked on every
 redirect), except your instance's own address. Turn that off in **Settings →

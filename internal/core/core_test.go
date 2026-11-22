@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -604,4 +605,33 @@ func TestWakeReconnectsWithoutWaitingOutTheBackoff(t *testing.T) {
 	e.app.Wake(true)
 	e.loop.until(t, "redialled", func() bool { return c.Status == Connected && c.wsGen > second })
 	e.loop.until(t, "synced again", func() bool { return e.srv.CallCount("GET /api/profiles") > syncs })
+}
+
+func TestSyncPrunesTranscriptsToTheMostRecentlyOpened(t *testing.T) {
+	old := KeepTranscripts
+	KeepTranscripts = 3
+	t.Cleanup(func() { KeepTranscripts = old })
+	e := setup(t, hermestest.Options{}, "")
+	ctx := context.Background()
+	t0 := time.Now().Add(-time.Hour)
+	for i := range 6 {
+		e.app.Cache.PutTranscript(ctx, "other", fmt.Sprint("old", i), nil, t0.Add(time.Duration(i)*time.Second))
+	}
+	e.app.Open(e.inst)
+	c := e.app.Conn
+	e.loop.until(t, "sync", func() bool { return c.Synced })
+	id := c.Sessions[0].ID
+	c.OpenChat(id)
+	e.loop.until(t, "the chat", func() bool { ch := c.Chats[id]; return ch != nil && ch.Fetched })
+	c.Refresh()
+	e.loop.until(t, "pruned", func() bool { n, _ := e.app.Cache.CountTranscripts(ctx); return n == 3 })
+	if _, _, ok, _ := e.app.Cache.Transcript(ctx, "i1", id); !ok {
+		t.Fatal("the chat just opened is kept")
+	}
+	if _, _, ok, _ := e.app.Cache.Transcript(ctx, "other", "old5"); !ok {
+		t.Fatal("then the most recent")
+	}
+	if _, _, ok, _ := e.app.Cache.Transcript(ctx, "other", "old0"); ok {
+		t.Fatal("the oldest goes")
+	}
 }
