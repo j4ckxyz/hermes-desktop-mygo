@@ -89,11 +89,14 @@ Instances** signs one in again or removes it.
   "N more sessions". A grid of dots marks a chat the agent is working in; a
   dot marks one with news you have not read. Click an agent to fold it.
 - **Chat.** Type in the box at the bottom and press **Enter** (Shift+Enter
-  for a new line). Replies stream in as Markdown. While the agent works, its
-  tool calls appear as pills ("Running command `grep …`"); once it is done
-  they fold into one line, "Ran 11 commands and made 7 tool calls", which
-  opens to show them. Click a pill to see its result. Messages typed while
-  the agent is busy queue behind its current work.
+  for a new line). Replies stream in as Markdown. The agent's work stays out
+  of the way: while it runs, one line says what it is doing ("Running
+  command… 0:42 · 3 tools"); once it is done, the line reads "Worked for 3
+  min, 36 secs · 18 tools". Click the line to see its reasoning and its tool
+  calls ("Ran 11 commands and made 7 tool calls", which opens to each
+  command), and click a call to see its result. Messages typed while the
+  agent is busy queue behind its current work.
+  ![A reply's work opened: its tool calls, one per pill](docs/screenshots/readme/work.png)
 - **Stop.** The pink button in the message box, or **Esc**.
 - **Questions and approvals.** When the agent needs you, a card appears in
   the chat: an approval for a risky command, a question or a batch of them,

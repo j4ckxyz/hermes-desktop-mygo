@@ -35,6 +35,14 @@ Full-size: `screenshots/before/`, `screenshots/after/` (and
 | Settings | Mist loader 5 lacked its outer ring | Ring 7–9 px out, in the accent's tint |
 | Settings | Sphere of light 3 drawn off-centre | The gradient now spans the whole sphere, lit from the top left |
 
+## Changed since, on request
+
+The agent's work (tool calls, commands, reasoning) now stays behind one
+line per reply, "Worked for 3 min, 36 secs · 18 tools", as the Hermes iOS
+app shows it, instead of the design's always-visible group pill and live
+pills; while the agent runs, the line carries its status ("Running
+command… 0:42 · 3 tools") and the design's "Thinking…" row folds into it.
+
 ## Differences kept, and why
 
 | Difference | Why |

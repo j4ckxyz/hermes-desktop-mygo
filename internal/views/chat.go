@@ -19,13 +19,12 @@ const contentWidth = 760
 type chatKind int
 
 const (
-	cUser chatKind = iota
-	cGroup
-	cTools
+	cUser      chatKind = iota
+	cWork               // "Worked for 3 min · 18 tools ⌄", or the running turn's status
+	cWorkPanel          // what the work line opens: reasoning, commentary, the tool calls
 	cText
 	cLink
 	cPrompt
-	cThinking
 	cError
 )
 
@@ -58,7 +57,9 @@ func (u *UI) chatRows(ch *core.Chat) []chatRow {
 			r.top = 0
 		case r.kind == cUser:
 			r.top = 24
-		case r.kind == cThinking || r.kind == cPrompt || r.kind == cError || afterUser:
+		case r.kind == cWorkPanel:
+			r.top = 8
+		case r.kind == cPrompt || r.kind == cError || afterUser:
 			r.top = 18
 		default:
 			r.top = 10
@@ -71,14 +72,12 @@ func (u *UI) chatRows(ch *core.Chat) []chatRow {
 		if t.User != "" {
 			add(chatRow{kind: cUser, turn: t})
 		}
-		if len(t.Tools) > 0 {
-			if t.Running() {
-				add(chatRow{kind: cTools, turn: t})
-			} else {
-				add(chatRow{kind: cGroup, turn: t})
-				if u.openGroups[t.ID] {
-					add(chatRow{kind: cTools, turn: t})
-				}
+		// The agent's work (tool calls, commands, reasoning) stays behind
+		// one line until it is opened, as the Hermes iOS app shows it.
+		if hasWork(t) || t.Running() {
+			add(chatRow{kind: cWork, turn: t})
+			if hasWork(t) && u.openWork[t.ID] {
+				add(chatRow{kind: cWorkPanel, turn: t})
 			}
 		}
 		chunks := splitReply(t.Text)
@@ -91,10 +90,6 @@ func (u *UI) chatRows(ch *core.Chat) []chatRow {
 		}
 		if t.Prompt != nil {
 			add(chatRow{kind: cPrompt, turn: t})
-		}
-		// "Thinking…" until the reply starts, or while a tool runs after it.
-		if t.Running() && t.Prompt == nil && (t.Text == "" || activity(t) != "Writing") {
-			add(chatRow{kind: cThinking, turn: t})
 		}
 		if t.Error != "" || t.Status == transcript.Interrupted {
 			add(chatRow{kind: cError, turn: t})
@@ -345,31 +340,11 @@ func (u *UI) chatRow(c *ui.Context, conn *core.Connection, ch *core.Chat, r chat
 			}
 		})
 
-	case cGroup:
-		open := u.openGroups[t.ID]
-		g := ui.Row(c).FillWidth().Gap(12).Padding(12, 16).Radius(18).Border(1, pal.AccentLine).Background(pal.AccentSoft).
-			AlignItems(ui.Center).Cursor(ui.CursorPointer).Focusable().Expanded(open).Label(t.Summary())
-		g.Children(func() {
-			GridLoader(c, "summary", pal.Accent, 3.5, 2, false)
-			ui.Text(c, t.Summary()).FontSize(15).TextColor(pal.Muted).Grow(1)
-			ui.Icon(c, icon("chevronDown")).Size(16, 16).TextColor(pal.Muted).Rotate(g.Animate("rot", map[bool]float32{true: 180, false: 0}[open], 150*time.Millisecond))
-		})
-		if g.Clicked() {
-			u.openGroups[t.ID] = !open
-			u.listFor(ch.ID).HoldPlace() // keep the group under the pointer
-		}
+	case cWork:
+		u.workLine(c, ch, t)
 
-	case cTools:
-		ui.Column(c).MarginStart(14).BorderWidth(0, 0, 0, 1.5).BorderColor(pal.Line2).Gap(8).Padding(2, 0, 2, 14).Children(func() {
-			if !t.Running() {
-				for _, it := range t.Interim {
-					ui.Text(c, it).FontSize(14).TextColor(pal.Muted).MaxLines(3).Ellipsis("…")
-				}
-			}
-			for _, tl := range t.Tools {
-				u.toolPill(c, tl)
-			}
-		})
+	case cWorkPanel:
+		u.workPanel(c, ch, t)
 
 	case cText:
 		opts := u.mdOptions(c)
@@ -399,17 +374,6 @@ func (u *UI) chatRow(c *ui.Context, conn *core.Connection, ch *core.Chat, r chat
 
 	case cPrompt:
 		u.promptCard(c, conn, ch, t)
-
-	case cThinking:
-		ui.Row(c).Gap(10).PaddingStart(4).AlignItems(ui.Center).Children(func() {
-			SphereLoader(c, "think", pal, 18, true)
-			label := "Thinking…"
-			if t.Thinking != "" && !strings.EqualFold(strings.Trim(t.Thinking, "…. "), "thinking") {
-				label = strings.TrimRight(t.Thinking, "…. ") + "…"
-			}
-			ui.Text(c, label+" "+clock(c.Now().Sub(t.Started))).FontSize(14).TextColor(pal.Muted)
-			c.After(time.Second - time.Duration(c.Now().Nanosecond()))
-		})
 
 	case cError:
 		msg := t.Error
@@ -911,4 +875,144 @@ func (u *UI) newChatView(c *ui.Context, conn *core.Connection) {
 		}
 	})
 	u.composer(c, conn, "", u.NewProfile, &u.draft, false, prof)
+}
+
+// hasWork reports whether a turn did anything besides replying.
+func hasWork(t *transcript.Turn) bool {
+	return len(t.Tools) > 0 || strings.TrimSpace(t.Reasoning) != "" || len(t.Interim) > 0
+}
+
+// workedFor reads a duration the way the iOS app does: "42 secs",
+// "3 min, 36 secs", "1 hr, 5 min".
+func workedFor(d time.Duration) string {
+	unit := func(n int, one, many string) string {
+		if n == 1 {
+			return "1 " + one
+		}
+		return itoa(n) + " " + many
+	}
+	sec := int(d.Round(time.Second) / time.Second)
+	switch {
+	case sec < 60:
+		return unit(max(sec, 1), "sec", "secs")
+	case sec < 3600:
+		if sec%60 == 0 {
+			return unit(sec/60, "min", "min")
+		}
+		return unit(sec/60, "min", "min") + ", " + unit(sec%60, "sec", "secs")
+	}
+	return unit(sec/3600, "hr", "hr") + ", " + unit(sec%3600/60, "min", "min")
+}
+
+// workLabel is the work line's text: what the agent is doing while it
+// runs, how long it worked once it is done.
+func workLabel(t *transcript.Turn, now time.Time) string {
+	tools := ""
+	if n := len(t.Tools); n > 0 {
+		tools = " · " + itoa(n) + map[bool]string{true: " tool", false: " tools"}[n == 1]
+	}
+	if t.Running() {
+		label := activity(t)
+		if label == "Thinking" && t.Thinking != "" && !strings.EqualFold(strings.Trim(t.Thinking, "…. "), "thinking") {
+			label = strings.TrimRight(t.Thinking, "…. ")
+		}
+		return label + "… " + clock(now.Sub(t.Started)) + tools
+	}
+	d := t.Ended.Sub(t.Started)
+	verb := "Worked"
+	switch {
+	case t.Status == transcript.Interrupted:
+		verb = "Stopped"
+	case len(t.Tools) == 0:
+		verb = "Thought"
+	}
+	if t.Started.IsZero() || t.Ended.IsZero() || d <= 0 {
+		if tools == "" {
+			return verb
+		}
+		return verb + tools
+	}
+	if verb == "Stopped" {
+		return "Stopped after " + workedFor(d) + tools
+	}
+	return verb + " for " + workedFor(d) + tools
+}
+
+// workLine is one quiet line per reply; clicking it shows the work.
+func (u *UI) workLine(c *ui.Context, ch *core.Chat, t *transcript.Turn) {
+	pal := &u.pal
+	open := u.openWork[t.ID]
+	label := workLabel(t, c.Now())
+	row := ui.Row(c).FillWidth().Gap(8).Padding(4, 2, 12, 2).BorderWidth(0, 0, 1, 0).BorderColor(pal.Line).AlignItems(ui.Center).Label(label)
+	if hasWork(t) {
+		row.Cursor(ui.CursorPointer).Focusable().Expanded(open).Role(ui.RoleDisclosure)
+	}
+	row.Children(func() {
+		if t.Running() {
+			SphereLoader(c, "think", pal, 18, true)
+			c.After(time.Second - time.Duration(c.Now().Nanosecond())) // tick the clock
+		}
+		ui.Text(c, label).FontSize(15).TextColor(pal.Muted).SingleLine().Ellipsis("…").Shrink(1)
+		if hasWork(t) {
+			ui.Icon(c, icon("chevronDown")).Size(16, 16).TextColor(pal.Muted).Shrink(0).
+				Rotate(row.Animate("rot", map[bool]float32{true: 180, false: 0}[open], 150*time.Millisecond))
+		}
+	})
+	if hasWork(t) && (row.Clicked() || row.Shortcut(0, ui.KeySpace)) {
+		u.openWork[t.ID] = !open
+		u.listFor(ch.ID).HoldPlace() // keep the line under the pointer
+	}
+}
+
+// workPanel is what a work line opens: the reasoning, the commentary, and
+// the tool calls (live while running, folded into one pill once done).
+func (u *UI) workPanel(c *ui.Context, ch *core.Chat, t *transcript.Turn) {
+	pal := &u.pal
+	ui.Column(c).FillWidth().BorderWidth(0, 0, 0, 3).BorderColor(pal.Line2).Padding(2, 0, 2, 24).Gap(10).Children(func() {
+		if r := strings.TrimSpace(t.Reasoning); r != "" {
+			ui.Text(c, r).FontSize(14).LineHeight(1.5).TextColor(pal.Muted).Italic().Selectable()
+		}
+		for _, it := range t.Interim {
+			ui.Text(c, it).FontSize(14).LineHeight(1.5).TextColor(pal.Muted).Selectable()
+		}
+		if len(t.Tools) == 0 {
+			return
+		}
+		if t.Running() {
+			for _, tl := range t.Tools {
+				u.toolPill(c, tl)
+			}
+			return
+		}
+		key := "tools:" + t.ID
+		open := u.openGroups[key]
+		failed := false
+		for _, tl := range t.Tools {
+			failed = failed || tl.Status == transcript.ToolFailed
+		}
+		summary := t.Summary()
+		g := ui.Row(c).FillWidth().Gap(12).Padding(12, 18).Radius(999).Background(pal.Pill).Border(1, pal.PillLine).
+			AlignItems(ui.Center).Cursor(ui.CursorPointer).Focusable().Expanded(open).Label(summary)
+		g.Children(func() {
+			if failed {
+				Icon(c, "warn", 20, ui.Hex("#EE736E"))
+			} else {
+				Icon(c, "checkCircle", 20, pal.OK)
+			}
+			ui.Text(c, summary).FontSize(15).TextColor(pal.Muted).Grow(1).SingleLine().Ellipsis("…")
+			ui.Icon(c, icon("chevronDown")).Size(16, 16).TextColor(pal.Muted).
+				Rotate(g.Animate("rot", map[bool]float32{true: 180, false: 0}[open], 150*time.Millisecond))
+		})
+		if g.Clicked() || g.Shortcut(0, ui.KeySpace) {
+			u.openGroups[key] = !open
+			u.listFor(ch.ID).HoldPlace()
+		}
+		if open {
+			ui.Column(c).MarginStart(18).BorderWidth(0, 0, 0, 1.5).BorderColor(pal.Line2).Padding(2, 0, 2, 14).Gap(8).Children(func() {
+				for _, tl := range t.Tools {
+					u.toolPill(c, tl)
+				}
+			})
+		}
+	})
 }

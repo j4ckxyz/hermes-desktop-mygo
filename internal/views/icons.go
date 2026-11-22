@@ -52,6 +52,7 @@ var iconSrc = map[string]string{
 	"window":       stroke + `<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/>` + end,
 	"key":          stroke + `<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3M14 9l2 2"/>` + end,
 	"copy":         stroke + `<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>` + end,
+	"checkCircle":  stroke + `<circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/>` + end,
 	"warn":         stroke + `<path d="M12 3 2 21h20zM12 10v5M12 18h.01"/>` + end,
 	"x":            stroke + `<path d="M6 6l12 12M18 6 6 18"/>` + end,
 }

@@ -62,7 +62,8 @@ type UI struct {
 	// so switching back to a chat neither re-measures nor loses its place.
 	lists      map[string]*ui.ListState
 	openGroups map[string]bool
-	draft      string // the new chat's composer text
+	openWork   map[string]bool // turns whose work line is open
+	draft      string          // the new chat's composer text
 	renaming   string
 	renameText string
 	// marbles are the icon-colour swatches, drawn in the background once.
@@ -89,7 +90,7 @@ type UI struct {
 
 // New returns the UI on its first screen.
 func New(app *core.App, s settings.Settings, native Native) *UI {
-	u := &UI{App: app, Settings: s, Native: native, expanded: map[string]bool{}, collapsed: map[string]bool{}, openGroups: map[string]bool{}, lists: map[string]*ui.ListState{}}
+	u := &UI{App: app, Settings: s, Native: native, expanded: map[string]bool{}, collapsed: map[string]bool{}, openGroups: map[string]bool{}, openWork: map[string]bool{}, lists: map[string]*ui.ListState{}}
 	u.SettingsPane = "Look & Feel"
 	if app.Conn != nil {
 		u.Screen = ScreenMain
@@ -399,7 +400,8 @@ func (u *UI) ExpandToolGroups() {
 	if c := u.App.Conn; c != nil {
 		if ch := c.Chats[u.Selected]; ch != nil {
 			for _, t := range ch.Turns {
-				u.openGroups[t.ID] = true
+				u.openWork[t.ID] = true
+				u.openGroups["tools:"+t.ID] = true
 			}
 		}
 	}

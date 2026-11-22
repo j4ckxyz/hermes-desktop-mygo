@@ -391,16 +391,73 @@ func TestToolGroupExpands(t *testing.T) {
 	h := newHarness(t, hermestest.Options{}, true)
 	h.synced()
 	h.u.Select("20261122_080205_fb120f")
-	h.settle("transcript", func() bool { return h.tt.HasText("Ran 11 commands and made 7 tool calls") })
+	line := "Worked for 3 min · 18 tools"
+	h.settle("transcript", func() bool { return h.tt.HasText(line) })
 	h.u.listFor(h.u.Selected).ScrollTo(0, ui.Start)
 	h.tt.Frame()
-	if h.tt.HasText("hermes cron show morning-0") {
-		t.Fatal("a finished turn's tools start collapsed")
+	if h.tt.HasText("Ran 11 commands and made 7 tool calls") || h.tt.HasText("hermes cron show morning-0") {
+		t.Fatal("a finished reply's work stays behind its line")
+	}
+	if err := h.tt.Click(line); err != nil {
+		t.Fatal(err)
+	}
+	h.tt.Frame()
+	if !h.tt.HasText("Ran 11 commands and made 7 tool calls") || h.tt.HasText("hermes cron show morning-0") {
+		t.Fatal("the line opens to the tool-call summary, still folded")
 	}
 	h.tt.Click("Ran 11 commands and made 7 tool calls")
 	h.tt.Frame()
 	if !h.tt.HasText("hermes cron show morning-0") {
 		t.Fatalf("expanded pills: %q", h.tt.Texts())
+	}
+}
+
+func TestRunningWorkIsFolded(t *testing.T) {
+	h := newHarness(t, hermestest.Options{Reply: "design_turn.jsonl", Delay: time.Millisecond}, true)
+	h.synced()
+	id := "20261122_060000_0a0b0c"
+	h.u.Select(id)
+	h.settle("chat", func() bool { ch := h.app.Conn.Chats[id]; return ch != nil && ch.Fetched })
+	h.tt.Type("find my notes")
+	h.tt.Key(0, ui.KeyEnter)
+	h.settle("running", func() bool {
+		ch := h.app.Conn.Chats[id]
+		cur := ch.Live.Current()
+		return cur != nil && len(cur.Tools) == 3
+	})
+	h.tt.Frame()
+	var line string
+	for _, s := range h.tt.Texts() {
+		if strings.HasPrefix(s, "Running command… ") && strings.HasSuffix(s, " · 3 tools") {
+			line = s
+		}
+	}
+	if line == "" {
+		t.Fatalf("the status line: %q", h.tt.Texts())
+	}
+	if h.tt.HasText("Mcp notion API post search") {
+		t.Fatal("live tool pills stay behind the line")
+	}
+	h.tt.Click(line)
+	h.tt.Frame()
+	if !h.tt.HasText("Mcp notion API post search") {
+		t.Fatal("opening the line shows the live pills")
+	}
+}
+
+func TestWorkedFor(t *testing.T) {
+	cases := map[time.Duration]string{
+		400 * time.Millisecond:                  "1 sec",
+		42 * time.Second:                        "42 secs",
+		3*time.Minute + 36*time.Second:          "3 min, 36 secs",
+		3 * time.Minute:                         "3 min",
+		61 * time.Second:                        "1 min, 1 sec",
+		time.Hour + 5*time.Minute + time.Second: "1 hr, 5 min",
+	}
+	for d, want := range cases {
+		if got := workedFor(d); got != want {
+			t.Errorf("workedFor(%v) = %q, want %q", d, got, want)
+		}
 	}
 }
 
