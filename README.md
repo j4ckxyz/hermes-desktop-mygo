@@ -29,28 +29,87 @@ chats so it never waits on the network to show you what you had.
 
 ## Install
 
-There are no signed release builds yet. Build it from source (any OS can
-build for every OS):
+**macOS and Linux**
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/j4ckxyz/hermes-desktop-mygo/main/install.sh | sh
+```
+
+**Windows**, in PowerShell
+
+```powershell
+irm https://raw.githubusercontent.com/j4ckxyz/hermes-desktop-mygo/main/install.ps1 | iex
+```
+
+Either one installs the latest release for you alone, without administrator
+rights:
+
+- macOS: in `/Applications`, or `~/Applications` if you can't write to
+  `/Applications`.
+- Linux: in `~/.local`, with the `hermes-desktop` command and a menu entry.
+- Windows: in `%LOCALAPPDATA%\Programs\Hermes`.
+
+Before installing, the scripts check what they download against the
+release: on macOS and Linux, the Ed25519 signature of the app's update key;
+on Windows, the installer's SHA-256.
+
+Run the command again to update. To uninstall:
+
+- macOS and Linux: `sh install.sh --uninstall`. Your settings stay.
+- Windows: remove it from **Settings → Apps**.
+
+Installing this way also avoids the warnings macOS and Windows show for apps
+from developers without a paid certificate. Those warnings are for files a
+browser marks as downloaded, and the scripts mark nothing. The builds are
+signed ad hoc, not by Apple or Microsoft.
+
+The [releases](../../releases) have the same builds to download by hand:
+
+- macOS: a disk image for both Apple silicon and Intel Macs.
+- Windows: an installer and a portable `.exe`, for x64 and Arm.
+- Linux: a `.deb` and a `.tar.gz`, for amd64 and arm64.
+
+A disk image downloaded in a browser needs right-click → **Open** the first
+time, or `xattr -dr com.apple.quarantine /Applications/Hermes.app`. On
+Windows, choose **More info → Run anyway**.
+
+Linux needs GTK 3 and libepoxy, which desktops already have. Staying signed
+in needs libsecret and a Secret Service (GNOME Keyring or KWallet).
+Hermes Desktop shows no web pages, so it doesn't need WebKitGTK.
+
+### Updates
+
+Hermes Desktop updates itself from the releases here.
+
+- **At launch:** if a newer version is out, it shows a page with what's new
+  before anything else.
+  - **Update and reopen** downloads the new version, checks it was signed
+    with Hermes Desktop's key, replaces the app and reopens it. It comes
+    back on the same instance and chat, with anything you hadn't sent still
+    in the message box.
+  - **Not now** leaves it until another day.
+- **While it runs:** it checks every six hours. A new version downloads
+  quietly, then a **Restart to update** toast appears.
+- **Settings → Updates** shows the version you have and the download's
+  progress. It has **Check now**, and a switch to turn automatic updates
+  off.
+
+Some copies can't update themselves, and the Updates pane says so:
+
+- Development builds.
+- A copy installed from the `.deb`. Install a newer `.deb` instead, or
+  use the install script.
+
+### Build it yourself
+
+You need Go 1.27.3 or later. Any OS can build for every OS:
 
 ```sh
 git clone https://github.com/j4ckxyz/hermes-desktop-mygo && cd hermes-desktop-mygo
 make build          # bin/hermes-desktop for this machine
 make cross          # dist/: macOS, Windows and Linux, amd64 and arm64
+go tool mygo build  # build/: the packaged app, as a release has it
 ```
-
-You need Go 1.27.3 or later. Every CI run also uploads the six builds as an
-artifact (Actions → the run → *hermes-desktop-…*).
-
-- **Linux:** `scripts/install-linux.sh` installs the app for your user
-  (`~/.local/bin`, a menu entry and the icon); open **Hermes** from your app
-  menu. It needs GTK 3, Pango, cairo and libepoxy, which every desktop has.
-  Keeping signed-in credentials needs a Secret Service (GNOME Keyring or
-  KWallet). `scripts/install-linux.sh --uninstall` removes it.
-- **macOS:** run `dist/hermes-desktop-darwin-arm64` (Apple silicon) or
-  `-amd64` (Intel). The binary is not signed yet, so macOS asks you to allow
-  it in **System Settings → Privacy & Security** the first time.
-- **Windows:** run `dist/hermes-desktop-windows-amd64.exe` (or `-arm64`).
-  SmartScreen may ask you to confirm, as the build is not signed yet.
 
 ## Sign in
 
@@ -185,6 +244,7 @@ make demo         # the app against an in-process fake instance (design data)
 make screenshots  # each screen of the demo build, on a private Xvfb
 make bench        # launch, chat switching and streaming numbers
 make icon         # draw the app icon to assets/ and resources/
+tools/update-test.sh  # install an old build, publish a newer one locally, update
 ```
 
 Linux needs GTK 3, Pango, cairo and libepoxy, and Xvfb for headless runs.
@@ -193,6 +253,32 @@ and either `HERMES_USERNAME`/`HERMES_PASSWORD` or `HERMES_API_KEY` in
 `.env.local` (gitignored), then
 `go test -tags live -run Live -v ./internal/hermes/`. It deletes the chat it
 creates.
+
+### Releasing
+
+To release a version:
+
+1. Set a new `version` in `mygo.json`.
+2. Describe its changes under a heading of that number in `CHANGELOG.md`.
+3. Push to `main`.
+
+`.github/workflows/release.yml` then builds and publishes the release:
+
+- The apps for every platform, with their installers.
+- The updates that installed copies fetch. These are signed with the key in
+  the repository's `MYGO_UPDATER_PRIVATE_KEY` secret.
+
+Installed apps accept only updates signed with that key, so keep a copy of
+it somewhere safe. If the key is lost, no installed copy can update again.
+
+Three workflows check each release on real macOS, Windows and Linux
+machines:
+
+- `ci.yml`: the tests.
+- `install-test.yml`: the install commands above, run against the latest
+  release.
+- `update-test.yml`: an installed copy replacing itself with a newer one,
+  then reopening by itself.
 
 | Path | What |
 |---|---|
