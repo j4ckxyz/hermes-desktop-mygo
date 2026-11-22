@@ -269,6 +269,9 @@ func TestPasswordInstance(t *testing.T) {
 	// The refresh token is refused (expired, revoked): no silent re-login
 	// with a kept password; the instance asks to sign in again.
 	e.srv.ExpireAll()
+	// Synced shows before the first sync lets go of its slot; a refresh
+	// meanwhile would be skipped (one sync at a time).
+	e.loop.until(t, "the first sync to end", func() bool { return !c.syncing.Load() })
 	c.Refresh()
 	e.loop.until(t, "signed out", func() bool { return c.Status == SignedOut })
 	if e.srv.CallCount("POST /auth/password-login") != 1 {
