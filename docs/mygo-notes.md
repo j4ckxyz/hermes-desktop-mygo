@@ -417,3 +417,9 @@ Location: a scratch directory (not in the repo) (`main.go`, `main_test.go`, `go.
 - **Windows materials:** `Window.SetVibrancy` changes the material only of a window created with one, and such a window has no menu bar (Alt/F10 open the menus). macOS changes vibrancy at any time.
 - **The Markdown theme has no padding or radius for inline code spans**, only a background.
 - **`ListState.HoldPlace()`** keeps a following list where it is for a frame, so a fold opening near the end does not scroll away.
+- **`LinearGradient{Start: x}` without `End` paints nothing visible:** only both zero mean 0 and 1, so `End` 0 puts `To` everywhere past `Start`. Give both, or `Stops`.
+- **An `Absolute` overlay over a `List` needs `ZIndex(1)`** to draw above the rows, and `PassThrough()` so it does not take their clicks.
+- **`mygo build` (v0.10.0) writes the install scripts:** `install.sh` (macOS and Linux, checking the archive's Ed25519 signature), `install.ps1` (Windows, checking the installer against `SHA256SUMS`) and a `SHA256SUMS` per build. Builds of several platforms in separate jobs each write their own `SHA256SUMS`: join them before publishing, as `release.yml` does. The Windows installer is `<slug>-setup-<version>-<arch>.exe`, and `install.ps1` finds it by that name in `SHA256SUMS`, so release files keep MyGo's names.
+- **A relaunch on macOS goes through `/usr/bin/open`**, which keeps the arguments but not the environment: whatever a relaunched app must still know (the update test's `--home` and `--debug`) goes in arguments.
+- **`App.SetName` in a packaged build replaces mygo.json's name**, which the single-instance lock is keyed on: set it only in unpackaged builds (`App.Version() == ""`).
+- **`Network.OnChanged` fires on changes of online/metered only**, not on every change of interface; `Power.OnResume` fires after sleep. Both run on the main thread.
