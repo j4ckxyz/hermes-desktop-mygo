@@ -324,7 +324,7 @@ func (u *UI) accentButton(c *ui.Context, label string) ui.Element {
 func (u *UI) progressBar(c *ui.Context, v float64) {
 	pal := &u.pal
 	ui.Box(c).Height(6).FillWidth().Radius(3).Background(pal.Surf2).Role(ui.RoleProgress).Children(func() {
-		ui.Box(c).WidthPercent(100*float32(max(v, 0.02))).Height(6).Radius(3).Background(pal.Accent)
+		ui.Box(c).WidthPercent(100 * float32(max(v, 0.02))).Height(6).Radius(3).Background(pal.Accent)
 	})
 }
 
