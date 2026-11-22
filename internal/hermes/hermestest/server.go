@@ -14,6 +14,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -74,6 +75,8 @@ type Options struct {
 	Latency time.Duration
 	// Seed fills the agents and sessions; nil uses DesignSeed.
 	Seed *Data
+	// Addr is the address to listen on ("" is a loopback port).
+	Addr string
 }
 
 // Data is the instance's content.
@@ -125,7 +128,18 @@ func New(opt Options) *Server {
 	} else {
 		s.data = DesignSeed(time.Now())
 	}
-	s.Server = httptest.NewServer(http.HandlerFunc(s.serve))
+	if opt.Addr == "" {
+		s.Server = httptest.NewServer(http.HandlerFunc(s.serve))
+		return s
+	}
+	s.Server = httptest.NewUnstartedServer(http.HandlerFunc(s.serve))
+	l, err := net.Listen("tcp", opt.Addr)
+	if err != nil {
+		panic(err)
+	}
+	s.Server.Listener.Close()
+	s.Server.Listener = l
+	s.Server.Start()
 	return s
 }
 

@@ -8,6 +8,7 @@
 package main
 
 import (
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -25,9 +26,19 @@ var demoServer *hermestest.Server
 
 func init() {
 	demoSetup = func(app *core.App, s *settings.Settings) error {
-		demoServer = hermestest.New(hermestest.Options{Token: "demo-token", Canonical: true, Delay: 400 * time.Millisecond})
+		// On systems that resolve *.localhost (systemd-resolved), the demo
+		// instance has the design's host name.
+		url := ""
+		if os.Getenv("HERMES_DEMO_HOSTNAME") != "" {
+			demoServer = hermestest.New(hermestest.Options{Token: "demo-token", Canonical: true, Delay: 400 * time.Millisecond, Addr: "[::1]:0"})
+			_, port, _ := net.SplitHostPort(demoServer.Listener.Addr().String())
+			url = "http://hermes-vps.localhost:" + port
+		} else {
+			demoServer = hermestest.New(hermestest.Options{Token: "demo-token", Canonical: true, Delay: 400 * time.Millisecond})
+			url = demoServer.URL
+		}
 		app.Secrets = secrets.NewWithBackend(&secrets.MemoryBackend{})
-		in := settings.Instance{ID: "demo", Name: "Main", URL: demoServer.URL, Auth: settings.AuthToken}
+		in := settings.Instance{ID: "demo", Name: "Main", URL: url, Auth: settings.AuthToken}
 		app.Secrets.Set(in.ID, secrets.Credentials{Token: "demo-token"})
 		app.Instances = settings.Instances{List: []settings.Instance{in}}
 		s.ActiveInstance = in.ID

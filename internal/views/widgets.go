@@ -269,7 +269,11 @@ func Loader(c *ui.Context, id string, pal *theme.Palette, large bool) ui.Element
 		cell, gap = 3.5, 2
 	}
 	if id == "" || id[0] == 'g' {
-		return GridLoader(c, id, pal.Accent, cell, gap, true)
+		col := pal.Accent
+		if !pal.Dark { // the bright accent is faint on a light canvas
+			col = pal.AccentText
+		}
+		return GridLoader(c, id, col, cell, gap, true)
 	}
 	return SphereLoader(c, id, pal, 4*cell+3*gap+4, true)
 }
