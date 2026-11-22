@@ -672,3 +672,19 @@ func TestNoMenuClaimsEsc(t *testing.T) {
 		}
 	}
 }
+
+func TestOpenFromNotice(t *testing.T) {
+	h := newHarness(t, hermestest.Options{}, true)
+	h.synced()
+	h.u.Screen = ScreenSettings
+	h.u.search.open = true
+	h.u.OpenFromNotice("i1", "20261122_060000_0a0b0c")
+	h.settle("chat", func() bool { return h.tt.HasText("Hey! What can I help with?") })
+	if h.u.Selected != "20261122_060000_0a0b0c" || h.u.Screen != ScreenMain || h.u.search.open {
+		t.Fatal("a notification click opens its chat")
+	}
+	h.u.OpenFromNotice("gone", "x") // an instance since removed: nothing happens
+	if h.u.Selected != "20261122_060000_0a0b0c" {
+		t.Fatal("unknown instance")
+	}
+}

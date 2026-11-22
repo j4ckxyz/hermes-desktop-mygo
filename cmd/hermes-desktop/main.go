@@ -169,15 +169,34 @@ func main() {
 			}
 		}
 		native := &nativeOS{iconDir: filepath.Dir(l.paths.cache)}
-		app.Notify = func(title, body string) {
+		app.Notify = func(n core.Notice) {
 			if u == nil || (win != nil && win.IsFocused()) {
 				return
 			}
-			native.chime(u.Settings.Sounds)
-			if u.Settings.NotifyOnFinish {
-				mygo.NewNotification(mygo.NotificationOptions{Title: title, Body: body}).Show()
+			want := u.Settings.NotifyOnFinish
+			if n.Kind == core.NoticeNeedsYou {
+				want = u.Settings.NotifyOnApproval
 			}
+			if !want {
+				return
+			}
+			native.chime(u.Settings.Sounds)
+			mygo.NewNotification(mygo.NotificationOptions{ID: n.ID(), Title: n.Title, Body: n.Body, Group: n.Chat}).Show()
 		}
+		// Clicking a notification (also one from before a relaunch) brings
+		// the window forward and opens its chat.
+		mygo.App.OnNotificationClick(func(id string) {
+			inst, chat, ok := core.ParseNoticeID(id)
+			if !ok || win == nil {
+				return
+			}
+			if win.IsMinimized() {
+				win.Restore()
+			}
+			win.Show()
+			win.Focus()
+			win.Update(func() { u.OpenFromNotice(inst, chat) })
+		})
 		// Which instance opens: the last one, else the first saved.
 		open, hasOpen := app.Instances.Find(s.ActiveInstance)
 		if !hasOpen && len(app.Instances.List) > 0 {

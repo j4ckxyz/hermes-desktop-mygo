@@ -36,11 +36,41 @@ type Deps struct {
 	// Now is the clock (tests fix it).
 	Now func() time.Time
 	// Notify shows an OS notification (nil: none).
-	Notify func(title, body string)
+	Notify func(Notice)
 	// Dial options for the socket (tests shorten the timings).
 	Dial hermes.DialOptions
 	// FetchTitle reads a link's page title (nil: FetchTitle).
 	FetchTitle func(ctx context.Context, url string) (string, error)
+}
+
+// NoticeKind is what a notification is about.
+type NoticeKind int
+
+const (
+	NoticeFinished NoticeKind = iota // an agent finished a reply
+	NoticeNeedsYou                   // an approval, a question, a password or a secret
+)
+
+// Notice is a notification about a chat; clicking it opens the chat.
+type Notice struct {
+	Kind        NoticeKind
+	Title, Body string
+	Instance    string // instance id
+	Chat        string // stored session id
+}
+
+// ID is the notification's id: one per chat, so a newer one replaces an
+// older, and the click knows what to open.
+func (n Notice) ID() string { return "hermes-chat:" + n.Instance + ":" + n.Chat }
+
+// ParseNoticeID reads a notification id back into its instance and chat.
+func ParseNoticeID(id string) (instance, chat string, ok bool) {
+	rest, ok := strings.CutPrefix(id, "hermes-chat:")
+	if !ok {
+		return "", "", false
+	}
+	instance, chat, ok = strings.Cut(rest, ":")
+	return instance, chat, ok && instance != "" && chat != ""
 }
 
 // App is the whole app state.
@@ -744,13 +774,13 @@ func (c *Connection) handleEvent(ev hermes.Event, now time.Time, touched map[*Ch
 			if t.Status == transcript.Errored {
 				body = "The agent stopped with an error."
 			}
-			c.app.Notify(title, body)
+			c.app.Notify(Notice{Kind: NoticeFinished, Title: title, Body: body, Instance: c.Instance.ID, Chat: ch.ID})
 		}
 		// Persist the finished turn with the stored transcript.
 		go c.loadChat(ch.ID, ch.Profile, true)
 	}
 	if cur := ch.Live.Current(); cur != nil && cur.Prompt != nil && (ev.Type == "approval.request" || ev.Type == "clarify.request") && c.app.Notify != nil {
-		c.app.Notify(promptTitle(*cur.Prompt), promptText(*cur.Prompt))
+		c.app.Notify(Notice{Kind: NoticeNeedsYou, Title: promptTitle(*cur.Prompt), Body: promptText(*cur.Prompt), Instance: c.Instance.ID, Chat: ch.ID})
 	}
 }
 
@@ -793,7 +823,7 @@ func (c *Connection) handleRequest(r hermes.ServerRequest, now time.Time, touche
 		ch.Live.SetPrompt(p, now)
 		touched[ch] = true
 		if c.app.Notify != nil {
-			c.app.Notify(promptTitle(p), promptText(p))
+			c.app.Notify(Notice{Kind: NoticeNeedsYou, Title: promptTitle(p), Body: promptText(p), Instance: c.Instance.ID, Chat: ch.ID})
 		}
 		return
 	}

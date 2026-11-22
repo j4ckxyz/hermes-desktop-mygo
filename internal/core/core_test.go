@@ -38,12 +38,13 @@ func (l *uiLoop) until(t *testing.T, what string, cond func() bool) {
 }
 
 type env struct {
-	srv   *hermestest.Server
-	app   *App
-	loop  *uiLoop
-	inst  settings.Instance
-	notes []string
-	mu    sync.Mutex
+	srv     *hermestest.Server
+	app     *App
+	loop    *uiLoop
+	inst    settings.Instance
+	notes   []string
+	notices []Notice
+	mu      sync.Mutex
 }
 
 func setup(t *testing.T, opt hermestest.Options, cachePath string) *env {
@@ -71,7 +72,12 @@ func setup(t *testing.T, opt hermestest.Options, cachePath string) *env {
 	}
 	e.app = New(Deps{
 		Post: e.loop.post, Cache: c, Secrets: sec,
-		Notify: func(title, body string) { e.mu.Lock(); e.notes = append(e.notes, title+": "+body); e.mu.Unlock() },
+		Notify: func(n Notice) {
+			e.mu.Lock()
+			e.notes = append(e.notes, n.Title+": "+n.Body)
+			e.notices = append(e.notices, n)
+			e.mu.Unlock()
+		},
 	}, settings.Instances{List: []settings.Instance{e.inst}})
 	t.Cleanup(func() {
 		if e.app.Conn != nil {
@@ -433,5 +439,30 @@ func TestServerRequestCards(t *testing.T) {
 				t.Fatalf("each card notifies: %v", e.notes)
 			}
 		})
+	}
+}
+
+func TestNoticesNameTheirChat(t *testing.T) {
+	e := setup(t, hermestest.Options{Delay: time.Millisecond}, "")
+	e.app.Open(e.inst)
+	c := e.app.Conn
+	e.loop.until(t, "connected", func() bool { return c.Synced && c.ws != nil })
+	id := "20261122_060000_0a0b0c"
+	ch := c.OpenChat(id)
+	e.loop.until(t, "subscribed", func() bool { return ch.subscribed })
+	c.Send(id, "default", "hi", nil)
+	e.loop.until(t, "notice", func() bool { e.mu.Lock(); defer e.mu.Unlock(); return len(e.notices) > 0 })
+	e.mu.Lock()
+	n := e.notices[0]
+	e.mu.Unlock()
+	if n.Kind != NoticeFinished || n.Instance != "i1" || n.Chat != id {
+		t.Fatalf("%+v", n)
+	}
+	inst, chat, ok := ParseNoticeID(n.ID())
+	if !ok || inst != "i1" || chat != id {
+		t.Fatalf("round trip %q", n.ID())
+	}
+	if _, _, ok := ParseNoticeID("mygo-abc"); ok {
+		t.Fatal("foreign ids are not ours")
 	}
 }

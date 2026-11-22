@@ -350,6 +350,19 @@ func (u *UI) Select(id string) {
 	conn.OpenChat(id)
 }
 
+// OpenFromNotice opens the chat a clicked notification is about, on its
+// instance.
+func (u *UI) OpenFromNotice(instance, chat string) {
+	if u.App.Conn == nil || u.App.Conn.Instance.ID != instance {
+		if _, ok := u.App.Instances.Find(instance); !ok {
+			return
+		}
+		u.switchInstance(instance)
+	}
+	u.search.open = false
+	u.Select(chat)
+}
+
 // JumpTo selects the n-th session row visible in the sidebar (Cmd+n).
 func (u *UI) JumpTo(n int) {
 	targets := u.side.targets

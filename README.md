@@ -114,6 +114,8 @@ Instances** signs one in again or removes it.
   on your instance a moment later.
 - **Notifications.** With the window in the background, the app tells you
   when an agent finishes or needs you, with a soft chime if Sounds is on.
+  Clicking one brings the window forward on that chat. (Approvals are
+  answered in the chat: the notifications have no buttons of their own.)
 
 ## Keyboard
 

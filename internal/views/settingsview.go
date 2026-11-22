@@ -525,7 +525,7 @@ func (u *UI) generalPane(c *ui.Context) {
 
 func (u *UI) infoPane(c *ui.Context) {
 	text := map[string]string{
-		"Permissions":    "Hermes asks before running risky commands. Approval cards appear in the chat; answer them there or from the notification. Your instance's approval rules (config.yaml → approvals) decide what needs asking.",
+		"Permissions":    "Hermes asks before running risky commands. Approval cards appear in the chat; answer them there. A notification tells you when one is waiting, and clicking it opens the chat. Your instance's approval rules (config.yaml → approvals) decide what needs asking.",
 		"Terminal & SSH": "Every chat can be continued from a shell on the instance: right-click it and choose Copy resume command (`hermes --resume <id>`).",
 		"Updates":        "Hermes Desktop " + Version + ". Updates are published as releases; this build checks for none on its own.",
 	}[u.SettingsPane]
