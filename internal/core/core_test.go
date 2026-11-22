@@ -2,8 +2,10 @@ package core
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -400,8 +402,11 @@ func TestLinkTitles(t *testing.T) {
 		w.Write([]byte("<html><head><title>\n  Hermes dashboard &middot; Cron jobs </title></head>"))
 	}))
 	defer page.Close()
+	allow := []string{strings.TrimPrefix(page.URL, "http://")} // as if it were the instance
 	loop := newLoop()
-	app := New(Deps{Post: loop.post}, settings.Instances{})
+	app := New(Deps{Post: loop.post, FetchTitle: func(ctx context.Context, url string) (string, error) {
+		return FetchTitleFrom(ctx, url, allow)
+	}}, settings.Instances{})
 	app.LinkPreviews = true
 	if app.LinkTitle(page.URL+"/cron") != "" {
 		t.Fatal("unknown at first")
@@ -415,6 +420,53 @@ func TestLinkTitles(t *testing.T) {
 	app.LinkPreviews = false
 	if app.LinkTitle("https://example.invalid/x") != "" || len(app.links.pending) != 0 {
 		t.Fatal("previews off: no fetch")
+	}
+}
+
+func TestLinkPreviewsStayOffPrivateAddresses(t *testing.T) {
+	for addr, blocked := range map[string]bool{
+		"127.0.0.1": true, "10.1.2.3": true, "172.20.0.1": true, "192.168.1.10": true, "169.254.169.254": true,
+		"100.100.100.100": true, "0.0.0.0": true, "224.0.0.1": true, "::1": true, "fe80::1": true, "fd7a:115c:a1e0::1": true,
+		"::ffff:127.0.0.1": true, "8.8.8.8": false, "1.1.1.1": false, "2606:4700::1111": false, "100.63.255.255": false,
+	} {
+		if got := BlockedAddress(netip.MustParseAddr(addr)); got != blocked {
+			t.Errorf("BlockedAddress(%s) = %v, want %v", addr, got, blocked)
+		}
+	}
+	inner := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte("<title>secret router page</title>"))
+	}))
+	defer inner.Close()
+	instance := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/hop":
+			http.Redirect(w, r, inner.URL+"/admin", http.StatusFound)
+		case "/json":
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"title":"x"}`))
+		default:
+			w.Header().Set("Content-Type", "text/html")
+			w.Write([]byte("<title>Instance</title>"))
+		}
+	}))
+	defer instance.Close()
+	ctx := context.Background()
+	allow := []string{strings.TrimPrefix(instance.URL, "http://")}
+	if _, err := FetchTitleFrom(ctx, inner.URL, nil); !errors.Is(err, ErrBlockedAddress) {
+		t.Fatalf("a loopback page: %v", err)
+	}
+	if got, err := FetchTitleFrom(ctx, instance.URL, allow); err != nil || got != "Instance" {
+		t.Fatalf("the instance's own page: %q %v", got, err)
+	}
+	if _, err := FetchTitleFrom(ctx, instance.URL+"/hop", allow); !errors.Is(err, ErrBlockedAddress) {
+		t.Fatalf("a redirect from the instance to another private address: %v", err)
+	}
+	if _, err := FetchTitleFrom(ctx, instance.URL+"/json", allow); err == nil {
+		t.Fatal("only HTML pages")
+	}
+	if _, err := FetchTitleFrom(ctx, "file:///etc/passwd", nil); err == nil {
+		t.Fatal("only web links")
 	}
 }
 

@@ -515,7 +515,7 @@ func (u *UI) generalPane(c *ui.Context) {
 			n.LinkPreviews = v
 			u.SetSettings(n)
 		})
-		u.note(c, "Link cards in replies show the page's title, fetched once, without cookies.")
+		u.note(c, "Link cards in replies show the page's title, fetched once, without cookies, and only from public addresses (or your instance's own).")
 		if u.Native != nil && u.Native.Platform() != "darwin" {
 			u.note(c, "Menus: press Alt or F10 to open File, Edit, Chat, View and Help.")
 		}

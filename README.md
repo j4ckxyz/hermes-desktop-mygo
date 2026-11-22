@@ -170,8 +170,10 @@ Other pages: **General** (link previews, the shortcuts), **Instances**,
 
 The cache only makes the app fast; deleting it loses nothing your instance
 does not have. Link cards fetch the title of the page they point to, once,
-without cookies; turn that off in **Settings → General → Load link
-previews**.
+without cookies, and only from public addresses: never your own machine or
+network (loopback, private, link-local and CGNAT ranges, checked on every
+redirect), except your instance's own address. Turn that off in **Settings →
+General → Load link previews**.
 
 ## Develop
 
